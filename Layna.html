@@ -182,6 +182,16 @@ textarea.form-input{height:70px;resize:vertical}
 .gate-sub code{background:var(--bg4);padding:1px 6px;border-radius:4px;font-size:12px;color:var(--accent)}
 .gate-actions{display:flex;gap:10px;justify-content:center;margin-top:24px;flex-wrap:wrap}
 .gate-note{color:var(--text3);font-size:12px;margin-top:16px}
+.gbtn{display:inline-flex;align-items:center;gap:10px;padding:11px 22px;background:#fff;color:#1a1a1a;border-radius:8px;font-weight:600;font-size:14px}
+.gbtn:hover{filter:brightness(.94)}
+.gbtn .gg{font-weight:700;color:#4285F4}
+.spin{width:34px;height:34px;border:3px solid var(--bg4);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:6px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.avatar{width:26px;height:26px;border-radius:50%;border:1px solid var(--border2);object-fit:cover}
+.hd-user{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+.hd-user .lo{color:var(--text3);cursor:pointer;font-size:11px;border:1px solid var(--border);border-radius:6px;padding:3px 8px}
+.hd-user .lo:hover{color:var(--text);border-color:var(--border2)}
+.deny-email{font-size:13px;color:var(--text3);margin:8px 0 18px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);padding:11px 18px;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:2000;font-size:13px}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:6px;border:2px solid var(--bg)}
@@ -195,7 +205,8 @@ textarea.form-input{height:70px;resize:vertical}
   <div class="header-actions">
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
-    <label class="user-field"><span>👤</span><input id="currentUser" type="text" placeholder="名前" /></label>
+    <label class="user-field" id="nameField"><span>👤</span><input id="currentUser" type="text" placeholder="名前" /></label>
+    <div class="hd-user hidden" id="authUserBox"></div>
     <button class="btn btn-primary" id="addBtn">+ 追加</button>
   </div>
 </header>
@@ -294,7 +305,8 @@ function reviewToStatus(st){return st}
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
-const currentUser=()=>($('#currentUser').value||'').trim()||'anonymous';
+let authUser=null; // {name,email,photo,role} when Google認証時
+const currentUser=()=>authUser?authUser.name:(($('#currentUser').value||'').trim()||'anonymous');
 function toast(m){const t=el('div','toast',m);document.body.appendChild(t);setTimeout(()=>t.remove(),2400)}
 function fmt(iso){if(!iso)return'';const d=new Date(iso);if(isNaN(d))return iso;const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())}
 
@@ -602,7 +614,82 @@ $('#folderStatus').onclick=connectFlow;
 $('#addBtn').onclick=()=>openAddModal(state.currentId);
 $('#searchInput').oninput=e=>{state.search=e.target.value;renderBody();resolveThumbs()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
-(async()=>{let prev=null;try{prev=localStorage.getItem('layna_mode')}catch(_){}try{if(await storage.tryReconnect()){await boot();return}if(storage._pending){renderGate();return}if(prev==='idb'){storage.useIdb();await boot();return}renderGate()}catch(e){renderGate()}})();
+async function startAppFlow(){
+  let prev=null;try{prev=localStorage.getItem('layna_mode')}catch(_){}
+  try{
+    if(await storage.tryReconnect()){await boot();return}
+    if(storage._pending){renderGate();return}
+    if(prev==='idb'){storage.useIdb();await boot();return}
+    renderGate();
+  }catch(e){renderGate()}
+}
+
+/* ===== 認証（Googleログイン + git許可リスト access.json）===== */
+let accessCfg=null,AUTH_ON=false;
+function roleFor(email){
+  if(!accessCfg||!email)return null;const e=email.toLowerCase();
+  const has=arr=>(arr||[]).some(x=>String(x).toLowerCase()===e);
+  if(has(accessCfg.operatorEmails))return 'operator';
+  if(has(accessCfg.adminEmails))return 'admin';
+  if(has(accessCfg.allowedEmails))return 'member';
+  const dom=e.split('@')[1]||'';
+  if((accessCfg.allowedDomains||[]).some(d=>String(d).toLowerCase().replace(/^@/,'')===dom))return 'member';
+  return null;
+}
+function authScreen(build){chrome(false);let s=$('#authScreen');if(s)s.remove();s=el('div','gate');s.id='authScreen';const box=el('div','gate-box');build(box);s.appendChild(box);document.body.appendChild(s)}
+function clearAuthScreen(){const s=$('#authScreen');if(s)s.remove()}
+function renderAuthLoading(){authScreen(box=>{box.innerHTML='<div class="gate-logo">La<b>y</b>na</div><div class="spin"></div><div class="gate-sub">認証を確認しています…</div>'})}
+function renderLogin(msg){authScreen(box=>{
+  box.innerHTML='<div class="gate-logo">La<b>y</b>na</div>';
+  box.appendChild(el('div','gate-sub','社内メンバー専用。Googleアカウントでログインしてください。'));
+  const acts=el('div','gate-actions');const b=el('button','gbtn');b.innerHTML='<span class="gg">G</span> Google でログイン';
+  b.onclick=async()=>{if(window.__laynaFB){try{await window.__laynaFB.login()}catch(e){toast('ログイン失敗: '+e.message)}}else toast('認証を初期化中です。数秒後に再試行してください。')};
+  acts.appendChild(b);box.appendChild(acts);
+  if(msg)box.appendChild(el('div','gate-note',msg));
+})}
+function renderDenied(user){authScreen(box=>{
+  box.innerHTML='<div class="gate-logo">La<b>y</b>na</div>';
+  box.appendChild(el('div','gate-sub','このアカウントにはアクセス権がありません。'));
+  box.appendChild(el('div','deny-email','ログイン中: '+(user.email||'')));
+  const acts=el('div','gate-actions');const b=el('button','btn btn-ghost','別のアカウントでログイン');b.onclick=async()=>{if(window.__laynaFB)await window.__laynaFB.logout()};acts.appendChild(b);box.appendChild(acts);
+  box.appendChild(el('div','gate-note','管理者に access.json の allowedEmails への追加を依頼してください。'));
+})}
+function showAuthedHeader(){
+  $('#nameField').classList.add('hidden');
+  const bx=$('#authUserBox');bx.classList.remove('hidden');bx.innerHTML='';
+  if(authUser.photo){const img=el('img','avatar');img.src=authUser.photo;img.referrerPolicy='no-referrer';bx.appendChild(img)}
+  bx.appendChild(el('span',null,authUser.name+((authUser.role==='admin'||authUser.role==='operator')?'（管理者）':'')));
+  const lo=el('span','lo','ログアウト');lo.onclick=async()=>{if(window.__laynaFB)await window.__laynaFB.logout()};bx.appendChild(lo);
+}
+async function onAuthChanged(u){
+  if(!u){authUser=null;renderLogin();return}
+  const role=roleFor(u.email);
+  if(!role){authUser=null;renderDenied(u);return}
+  authUser={name:u.displayName||u.email,email:u.email,photo:u.photoURL,role};
+  clearAuthScreen();showAuthedHeader();startAppFlow();
+}
+async function initApp(){
+  try{accessCfg=await (await fetch('./access.json',{cache:'no-store'})).json()}catch(_){accessCfg=null}
+  AUTH_ON=!!(accessCfg&&accessCfg.authRequired)&&location.hostname==='ogshaw03.github.io';
+  if(!AUTH_ON){startAppFlow();return}       // exe/ローカル/プレビューは自動的に認証オフ
+  window.__laynaAuthChanged=onAuthChanged;
+  renderAuthLoading();
+  if(window.__laynaFBUser!==undefined)onAuthChanged(window.__laynaFBUser);
+  setTimeout(()=>{if(AUTH_ON&&!authUser&&!window.__laynaFB)renderLogin('認証の初期化に時間がかかっています。ネットワークをご確認ください。')},6000);
+}
+initApp();
+</script>
+<script type="module">
+  // Googleログイン用（OGREF と同じ Firebase Auth を流用。ドメイン ogshaw03.github.io は承認済み）
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  const firebaseConfig={apiKey:"AIzaSyASqL2Qp8sGrkzHz7J_HhE6QXntAZOO7RE",authDomain:"animref-ef532.firebaseapp.com",projectId:"animref-ef532",storageBucket:"animref-ef532.firebasestorage.app",messagingSenderId:"1029274074603",appId:"1:1029274074603:web:f0ddc3eb69e35a47276dae"};
+  window.__laynaFBUser=undefined;
+  try{
+    const app=initializeApp(firebaseConfig);const auth=getAuth(app);const provider=new GoogleAuthProvider();
+    window.__laynaFB={login:()=>signInWithPopup(auth,provider),logout:()=>signOut(auth)};
+    onAuthStateChanged(auth,u=>{const uu=u?{displayName:u.displayName,email:u.email,photoURL:u.photoURL}:null;window.__laynaFBUser=uu;if(window.__laynaAuthChanged)window.__laynaAuthChanged(uu)});
+  }catch(e){window.__laynaFBError=e&&e.message;window.__laynaFBUser=null;if(window.__laynaAuthChanged)window.__laynaAuthChanged(null);}
 </script>
 </body>
 </html>

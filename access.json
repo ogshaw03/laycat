@@ -1,0 +1,7 @@
+{
+  "_comment": "Layna アクセス許可リスト（git管理）。ライブサイト https://ogshaw03.github.io/Layna/ で Googleログイン時に照合されます。付与するには allowedEmails にメールアドレスを追加して commit/push（GitHub上で直接編集も可）。authRequired を false にすると認証を無効化できます（exe/社内配布向け）。github.io 以外（ローカル/exe/プレビュー）では自動的に認証オフになります。",
+  "authRequired": true,
+  "adminEmails": ["ogusho1101@gmail.com"],
+  "allowedEmails": [],
+  "allowedDomains": []
+}
