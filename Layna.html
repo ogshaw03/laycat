@@ -348,6 +348,9 @@ function renderGate(){
   }else if(support){
     const b=el('button','btn','保存先フォルダを選択');
     b.onclick=connectFlow;acts.appendChild(b);
+    // file:// でフォルダ選択がブロックされる環境向けのフォールバック
+    const b2=el('button','btn ghost','ブラウザ内保存で続ける');
+    b2.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b2);
   }else{
     const b=el('button','btn','ブラウザ内保存で開始');
     b.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b);
@@ -361,7 +364,11 @@ function renderGate(){
 }
 async function connectFlow(){
   try{await storage.pickFolder();await boot();}
-  catch(e){if(e.name!=='AbortError')toast('フォルダ接続に失敗: '+e.message)}
+  catch(e){
+    if(e.name==='AbortError')return; // ユーザーがキャンセル
+    // file:// でブロックされた等。ブラウザ内保存を案内
+    toast('フォルダ選択が使えない環境です。「ブラウザ内保存で続ける」をご利用ください: '+e.message);
+  }
 }
 
 /* ============================================================
