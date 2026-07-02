@@ -106,6 +106,9 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .vcard-cnt{position:absolute;bottom:6px;right:8px;font-size:10px;color:rgba(255,255,255,.75);background:rgba(0,0,0,.5);padding:1px 6px;border-radius:8px;z-index:3}
 .vcard-ov{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 9px;background:linear-gradient(transparent,rgba(0,0,0,.9));z-index:2;pointer-events:none}
 .vcard-ov .t{font-size:12px;font-weight:500;color:#fff;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.vcard-name-big{font-family:var(--font-head);font-size:18px;font-weight:700;padding:10px 12px 12px;line-height:1.3}
+.log-gen{padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--border);background:var(--bg2)}
+.log-gen-head{font-family:var(--font-head);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase}
 .badge{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600}
 .badge-empty{background:rgba(90,90,106,.25);color:#9a9aaa}
 .badge-pending{background:rgba(120,120,140,.3);color:#cbd5e1}
@@ -135,7 +138,8 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .log-open:hover{background:rgba(255,255,255,.18)}
 
 /* カスタム動画プレイヤー（タイル内） */
-.vp-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:52px;color:rgba(255,255,255,.85);text-shadow:0 4px 18px rgba(0,0,0,.8);pointer-events:none;z-index:3;transition:opacity .2s,transform .2s}
+.vp-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:52px;color:rgba(255,255,255,.85);text-shadow:0 4px 18px rgba(0,0,0,.8);pointer-events:none;z-index:3;transition:opacity .2s,transform .2s;opacity:0}
+.log-media:hover .vp-center:not(.off){opacity:1}
 .vp-center.off{opacity:0;transform:scale(1.4)}
 .vp-bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;padding:10px 14px 9px 10px;background:linear-gradient(transparent,rgba(0,0,0,.88));opacity:0;transition:opacity .18s;z-index:5}
 .log-media:hover .vp-bar{opacity:1}
@@ -287,8 +291,8 @@ textarea.form-input{height:70px;resize:vertical}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:6px;border:2px solid var(--bg)}
 
-/* 構造境界線：水色＋軽量グロー（静的box-shadowのみ・アニメなし） */
-:root{--edge:rgba(92,214,230,.5);--edgeglow:rgba(92,214,230,.14)}
+/* 構造境界線：明るい青＋軽量グロー（静的box-shadowのみ・アニメなし） */
+:root{--edge:rgba(96,165,255,.7);--edgeglow:rgba(96,165,255,.22)}
 .header{border-bottom-color:var(--edge);box-shadow:0 1px 10px var(--edgeglow)}
 .sidebar{border-right-color:var(--edge);box-shadow:1px 0 10px var(--edgeglow)}
 .fb-top{border-bottom-color:var(--edge);box-shadow:0 1px 10px var(--edgeglow)}
@@ -375,7 +379,7 @@ const storage={
 /* ---------- 状態 / DB ---------- */
 let DB=null;let curUploadUI=null;
 const state={currentId:null,search:'',expanded:new Set(),frameOrder:false};
-function defaultDb(){return{version:2,templates:defaultTemplates(),nodes:[]}}
+function defaultDb(){return{version:2,templates:defaultTemplates(),nodes:[],reels:[]}}
 async function persist(){await storage.saveDb(DB)}
 
 /* v1(projects/shots) → v2(nodes) 移行 */
@@ -444,6 +448,7 @@ async function boot(){
   else if(raw.nodes)DB=raw;               // v2
   else DB=migrate(raw);                    // v1 → v2
   if(!Array.isArray(DB.nodes))DB.nodes=[];
+  if(!Array.isArray(DB.reels))DB.reels=[];
   if(!Array.isArray(DB.templates)||!DB.templates.length)DB.templates=defaultTemplates();
   // ページ種別の補完（未設定は: 動画があればレビュー、なければセクション）
   for(const n of DB.nodes)if(!n.type)n.type=(n.versions&&n.versions.length)?'review':'section';
@@ -538,15 +543,19 @@ function renderSectionBody(s,cur){
   const q=state.search.trim().toLowerCase();
   let kids=childrenOf(parentId);
   if(q)kids=kids.filter(n=>n.name.toLowerCase().includes(q));
+  const isRoot=!cur;
   const secl=el('div','section-label');secl.appendChild(el('span',null,cur?'サブ項目 / 工程':'プロジェクト'));
-  const acts=el('div','acts');
-  const addBtn=el('button','btn btn-ghost btn-sm','+ 追加');addBtn.onclick=()=>openAddModal(parentId);acts.appendChild(addBtn);
-  if(cur){const tb=el('button','btn btn-ghost btn-sm','テンプレートから作成');tb.onclick=()=>openTemplateModal(parentId);acts.appendChild(tb)}
-  secl.appendChild(acts);s.appendChild(secl);
-  if(!kids.length){s.appendChild(el('div','empty',cur?'まだ項目がありません。「+ 追加」で工程（レビュー）や下位セクションを作成してください。':'プロジェクトがまだありません。「+ プロジェクト」から作成してください。'));return}
+  if(cur){
+    const acts=el('div','acts');
+    const addBtn=el('button','btn btn-ghost btn-sm','+ 追加');addBtn.onclick=()=>openAddModal(parentId);acts.appendChild(addBtn);
+    const tb=el('button','btn btn-ghost btn-sm','テンプレートから作成');tb.onclick=()=>openTemplateModal(parentId);acts.appendChild(tb);
+    secl.appendChild(acts);
+  }
+  s.appendChild(secl);
+  if(!kids.length){s.appendChild(el('div','empty',cur?'まだ項目がありません。「+ 追加」で工程（レビュー）や下位セクションを作成してください。':'プロジェクトがまだありません。右上の「+ プロジェクト」から作成してください。'));return}
   const grid=el('div','grid');
-  for(const n of kids)grid.appendChild(nodeCard(n));
-  const addTile=el('div','add-tile');addTile.innerHTML='<div class="p">＋</div><div>追加</div>';addTile.onclick=()=>openAddModal(parentId);grid.appendChild(addTile);
+  for(const n of kids)grid.appendChild(nodeCard(n,isRoot));
+  if(cur){const addTile=el('div','add-tile');addTile.innerHTML='<div class="p">＋</div><div>追加</div>';addTile.onclick=()=>openAddModal(parentId);grid.appendChild(addTile)}
   s.appendChild(grid);
 }
 
@@ -568,17 +577,16 @@ function renderReviewBody(s,cur){
   s.appendChild(log);
 }
 
-function nodeCard(node){
+function nodeCard(node,isRoot){
   const isRev=node.type==='review';const kids=childrenOf(node.id);const card=el('div','vcard');
   const tw=el('div','vcard-thumb');const lv=node.versions[node.versions.length-1];
   if(node.thumbnail){
     if(isRev&&lv&&lv.type==='video'){
       const v=el('video','vcard-video');v.dataset.vref=lv.file;v.dataset.poster=node.thumbnail;v.muted=true;v.loop=true;v.playsInline=true;v.preload='metadata';
       v.onmouseenter=()=>{v.play().catch(()=>{})};v.onmouseleave=()=>{try{v.pause();v.currentTime=0}catch(_){}};
-      tw.appendChild(v);tw.appendChild(el('div','vcard-play','▶'));
+      tw.appendChild(v);
     }else{
       const img=el('img');img.dataset.ref=node.thumbnail;tw.appendChild(img);
-      if(lv&&lv.type==='video')tw.appendChild(el('div','vcard-play','▶'));
     }
   }
   else{const ni=el('div','vcard-noimg');ni.appendChild(el('div','g',isRev?'🎬':'▦'));ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空セクション')));tw.appendChild(ni)}
@@ -586,8 +594,11 @@ function nodeCard(node){
   if(isRev){if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length))}
   else if(kids.length)tw.appendChild(el('div','vcard-cnt','📁 '+kids.length));
   const a=el('div','vcard-actions');const d=el('button','vcard-act','🗑');d.title='削除';d.onclick=e=>{e.stopPropagation();deleteNode(node)};a.appendChild(d);tw.appendChild(a);
-  const ov=el('div','vcard-ov');ov.appendChild(el('div','t',(isRev?'🎬 ':'📁 ')+node.name));tw.appendChild(ov);
-  card.appendChild(tw);card.onclick=()=>go(node.id);return card;
+  if(!isRoot){const ov=el('div','vcard-ov');ov.appendChild(el('div','t',(isRev?'🎬 ':'📁 ')+node.name));tw.appendChild(ov)}
+  card.appendChild(tw);
+  /* プロジェクト一覧では名前をタイルの外（下）に大きく表示 */
+  if(isRoot)card.appendChild(el('div','vcard-name-big',node.name));
+  card.onclick=()=>go(node.id);return card;
 }
 
 /* ============================================================
@@ -758,31 +769,46 @@ function logItem(node,v){
   head.appendChild(title);
   head.appendChild(el('span','log-meta','by '+(v.uploadedBy||'-')+'・'+fmt(v.uploadedAt)));
   if(v.type==='video'){const rb=el('button','btn btn-ghost btn-sm','🎞');rb.title='REEL に送る';rb.onclick=()=>sendToReel(node,v);head.appendChild(rb)}
+  /* この動画が含まれる保存済みリール */
+  for(const r of (DB.reels||[]).filter(r=>r.clips.some(c=>c.vId===v.id)).slice(0,2)){
+    const lb=el('button','btn btn-ghost btn-sm','🎞 '+r.name);lb.title='保存済みリールを開く';
+    lb.onclick=()=>openReelFromSaved(r.id);head.appendChild(lb);
+  }
   const detail=el('button','btn btn-ghost btn-sm','チェック / 詳細');detail.onclick=()=>openReview(node.id,v.id);head.appendChild(detail);
   it.appendChild(head);
-  // 動画左・コメント右のレイアウト
+  // 動画左（＋ショット全体コメント）・フレームコメント右のレイアウト
   const flexw=el('div','log-flex');
   const left=el('div','log-left');left.appendChild(media);flexw.appendChild(left);
-  const side=el('div','log-side');
-  side.appendChild(el('div','log-side-head','コメント / フレームFB'));
-  const notes=el('div','log-side-list');
-  if(!v.review.notes.length)notes.appendChild(el('div','log-empty-note','コメントはまだありません。'));
   const refresh=async()=>{await persist();renderBody();resolveThumbs()};
   const seekInline=v.type==='video'?f=>{const vd=media.querySelector('video');if(vd){vd.pause();vd.currentTime=f/(v.fps||24)+0.0001}}:null;
-  let arr=[...v.review.notes];
-  if(state.frameOrder)arr.sort((a,b)=>((a.frame??1e9)-(b.frame??1e9))||String(a.time).localeCompare(String(b.time)));
   const shot={fileRef:v.file,fps:v.fps||24,isVideo:v.type==='video'};
+  const mkInput=(ph,frameFn)=>{
+    const iw=el('div','log-note-input');
+    const ta=el('textarea');ta.placeholder=ph;
+    const sb=el('button','btn btn-primary btn-sm','送信');
+    const send=async()=>{const txt=ta.value.trim();if(!txt)return;const n={author:currentUser(),text:txt,time:nowIso()};const fr=frameFn?frameFn():null;if(fr!=null)n.frame=fr;v.review.notes.push(n);await persist();renderBody();resolveThumbs()};
+    sb.onclick=send;ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
+    iw.appendChild(ta);iw.appendChild(sb);return iw;
+  };
+  /* ショット全体へのコメント（frameなし）→ 動画の下 */
+  const gen=el('div','log-gen');
+  gen.appendChild(el('div','log-gen-head','ショット全体へのコメント'));
+  const genNotes=v.review.notes.filter(n=>n.frame==null);
+  if(!genNotes.length)gen.appendChild(el('div','log-empty-note','コメントはまだありません。'));
+  for(const n of genNotes)gen.appendChild(noteBlock(v,n,{refresh,shot}));
+  gen.appendChild(mkInput('ショット全体へのコメント…（Shift+Enterで改行）',null));
+  left.appendChild(gen);
+  /* フレームコメント（frameあり）→ 動画の右側 */
+  const side=el('div','log-side');
+  side.appendChild(el('div','log-side-head','フレームコメント / FB'));
+  const notes=el('div','log-side-list');
+  let arr=v.review.notes.filter(n=>n.frame!=null);
+  if(state.frameOrder)arr.sort((a,b)=>((a.frame??1e9)-(b.frame??1e9))||String(a.time).localeCompare(String(b.time)));
+  if(!arr.length)notes.appendChild(el('div','log-empty-note','フレームコメントはまだありません。FB画面（⤢）または下の入力から。'));
   for(const n of arr)notes.appendChild(noteBlock(v,n,{refresh,onSeek:seekInline,shot}));
   side.appendChild(notes);
-  // コメント入力（Shift+Enterで改行、Enterで送信）
-  const iw=el('div','log-note-input');
-  const ta=el('textarea');ta.placeholder='コメントを書く…（Shift+Enterで改行）';
-  const sb=el('button','btn btn-primary btn-sm','送信');
-  const send=async()=>{const txt=ta.value.trim();if(!txt)return;v.review.notes.push({author:currentUser(),text:txt,time:nowIso()});await persist();renderBody();resolveThumbs()};
-  sb.onclick=send;
-  ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
-  iw.appendChild(ta);iw.appendChild(sb);
-  side.appendChild(iw);
+  /* 右側の入力は「動画の現在フレーム」に紐づく */
+  side.appendChild(mkInput('現在のフレームにコメント…',v.type==='video'?()=>{const vd=media.querySelector('video');return vd?Math.round((vd.currentTime||0)*(v.fps||24)):0}:null));
   flexw.appendChild(side);
   it.appendChild(flexw);
   return it;
@@ -935,9 +961,12 @@ function openReview(nodeId,versionId){
   const wrap=el('div','fb-media-wrap');
   const media=isVideo?el('video'):el('img');
   if(isVideo){media.playsInline=true;media.preload='auto'}
-  wrap.appendChild(media);
-  const trace=el('div','fb-trace');wrap.appendChild(trace); // トラッキングペーパー（白レイヤー）
-  const canvas=el('canvas','fb-canvas');canvas.style.pointerEvents='none';wrap.appendChild(canvas);
+  /* ズーム/トラック用ラッパー（media/トレペ/キャンバスをまとめて変形） */
+  const zoomEl=el('div');zoomEl.style.cssText='position:absolute;inset:0;transform-origin:0 0';
+  wrap.appendChild(zoomEl);
+  zoomEl.appendChild(media);
+  const trace=el('div','fb-trace');zoomEl.appendChild(trace); // トラッキングペーパー（白レイヤー）
+  const canvas=el('canvas','fb-canvas');canvas.style.pointerEvents='none';zoomEl.appendChild(canvas);
   stage.appendChild(wrap);
 
   /* --- タイムライン（フレーム目盛り・シンクスケッチ風） --- */
@@ -967,6 +996,11 @@ function openReview(nodeId,versionId){
   const ghostBtn=el('button','btn btn-ghost btn-sm tool','ゴースト');ghostBtn.title='前後フレームのアノテーションを半透明表示';
   const eyeBtn=el('button','btn btn-ghost btn-sm tool active','👁');eyeBtn.title='アノテーションの表示/非表示';
   const traceBtn=el('button','btn btn-ghost btn-sm','トレペ 0%');traceBtn.title='白レイヤー（トラッキングペーパー）の濃さを25%ずつ切替';
+  const ziBtn=el('button','btn btn-ghost btn-sm','🔍+');ziBtn.title='ズームイン（ホイールでも可）';
+  const zoBtn=el('button','btn btn-ghost btn-sm','🔍−');zoBtn.title='ズームアウト';
+  const zoomLab=el('span','fb-frame','100%');zoomLab.style.minWidth='48px';
+  const zrBtn=el('button','btn btn-ghost btn-sm','等倍');zrBtn.title='ズームリセット';
+  const handBtn=el('button','btn btn-ghost btn-sm tool','✋ トラック');handBtn.title='ドラッグで表示位置を移動（中ボタンドラッグでも可）';
   const eraserBtn=el('button','btn btn-ghost btn-sm tool','◌ 消しゴム');eraserBtn.title='ブラシのようになぞって消す（選択中レイヤーのみ・未送信の線）';
   const brushSel=el('select');[2,4,6,10,16,24].forEach(n=>brushSel.appendChild(new Option('ブラシ '+n,n)));brushSel.value='4';brushSel.title='ブラシサイズ(px)';
   const eraseSel=el('select');[8,16,28,44,64].forEach(n=>eraseSel.appendChild(new Option('消し '+n,n)));eraseSel.value='16';eraseSel.title='消しゴムサイズ(px)';
@@ -976,9 +1010,36 @@ function openReview(nodeId,versionId){
   ctr.appendChild(drawBtn);ctr.appendChild(brushSel);ctr.appendChild(eraserBtn);ctr.appendChild(eraseSel);ctr.appendChild(clrRow);ctr.appendChild(colorIn);
   if(isVideo){ctr.appendChild(durSel);ctr.appendChild(ghostBtn)}
   ctr.appendChild(eyeBtn);ctr.appendChild(traceBtn);
+  ctr.appendChild(ziBtn);ctr.appendChild(zoBtn);ctr.appendChild(zoomLab);ctr.appendChild(zrBtn);ctr.appendChild(handBtn);
   ctr.appendChild(undoBtn);ctr.appendChild(clearBtn);
   stage.appendChild(ctr);
   body.appendChild(stage);
+
+  /* --- ズーム / トラック（寄った状態でアノテ描画可） --- */
+  const Zm={s:1,x:0,y:0,hand:false,panning:false,px:0,py:0};
+  function applyZoom(){zoomEl.style.transform='translate('+Zm.x+'px,'+Zm.y+'px) scale('+Zm.s+')';zoomLab.textContent=Math.round(Zm.s*100)+'%'}
+  function zoomTo(ns,cx,cy){
+    ns=Math.max(1,Math.min(8,ns));
+    const r=wrap.getBoundingClientRect();
+    if(cx==null){cx=r.width/2;cy=r.height/2}
+    const k=ns/Zm.s;
+    Zm.x=cx-k*(cx-Zm.x);Zm.y=cy-k*(cy-Zm.y);Zm.s=ns;
+    if(Zm.s===1){Zm.x=0;Zm.y=0}
+    applyZoom();
+  }
+  ziBtn.onclick=()=>zoomTo(Zm.s*1.4);
+  zoBtn.onclick=()=>zoomTo(Zm.s/1.4);
+  zrBtn.onclick=()=>zoomTo(1);
+  handBtn.onclick=()=>{Zm.hand=!Zm.hand;handBtn.classList.toggle('active',Zm.hand);if(Zm.hand)setTool(null);wrap.style.cursor=Zm.hand?'grab':''};
+  wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoomTo(Zm.s*(e.deltaY<0?1.15:1/1.15),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+  wrap.addEventListener('pointerdown',e=>{
+    if(!(Zm.hand||e.button===1))return;
+    Zm.panning=true;Zm.px=e.clientX;Zm.py=e.clientY;
+    try{wrap.setPointerCapture(e.pointerId)}catch(_){}
+    wrap.style.cursor='grabbing';e.preventDefault();
+  });
+  wrap.addEventListener('pointermove',e=>{if(!Zm.panning)return;Zm.x+=e.clientX-Zm.px;Zm.y+=e.clientY-Zm.py;Zm.px=e.clientX;Zm.py=e.clientY;applyZoom()});
+  wrap.addEventListener('pointerup',()=>{Zm.panning=false;wrap.style.cursor=Zm.hand?'grab':''});
 
   /* --- レイヤーパネル（動画右側・プレビュー付き縦並び） --- */
   const layersPanel=el('div','fb-layers');
@@ -1189,7 +1250,7 @@ function openReview(nodeId,versionId){
     drawBtn.classList.toggle('active',tool==='draw');
     eraserBtn.classList.toggle('active',tool==='erase');
     canvas.style.pointerEvents=tool?'auto':'none';
-    if(tool&&isVideo)media.pause();
+    if(tool){Zm.hand=false;handBtn.classList.remove('active');wrap.style.cursor='';if(isVideo)media.pause()}
   }
   drawBtn.onclick=()=>setTool(tool==='draw'?null:'draw');
   eraserBtn.onclick=()=>setTool(tool==='erase'?null:'erase');
@@ -1205,6 +1266,7 @@ function openReview(nodeId,versionId){
     if(res){pending=rest.concat(res);drawAll();drawTimeline()}
   }
   canvas.onpointerdown=e=>{
+    if(e.button!==0)return; // 中/右ボタンはパン等に譲る
     if(tool==='draw'){canvas.setPointerCapture(e.pointerId);stroke={color:colorIn.value,points:[pt(e)],f:dispFrame(),layer:activeLayer,w:(parseInt(brushSel.value)||4)/canvas.width}}
     else if(tool==='erase'){canvas.setPointerCapture(e.pointerId);erasing=true;eraseAt(e)}
   };
@@ -1310,7 +1372,7 @@ function openReel(){
    +'.clr{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.3);cursor:pointer;padding:0}'
    +'.ntxt{flex:1;min-width:110px;background:#1c1c1f;border:1px solid #2a2a2f;border-radius:6px;color:#e8e8ec;padding:5px 8px;font-size:12px;font-family:inherit}'
    /* ショットリスト（左） */
-   +'.rside{width:230px;border-right:1px solid rgba(92,214,230,.5);box-shadow:1px 0 10px rgba(92,214,230,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
+   +'.rside{width:230px;border-right:1px solid rgba(96,165,255,.5);box-shadow:1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.rside-h{font-size:10px;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:10px 10px 6px;display:flex;justify-content:space-between;align-items:center}'
    +'.rlist{flex:1;overflow-y:auto;padding:0 8px 10px;display:flex;flex-direction:column;gap:6px}'
    +'.snode{border:1px solid #2a2a2f;border-radius:8px;padding:7px 9px}'
@@ -1321,7 +1383,7 @@ function openReel(){
    +'.addb{border:1px solid #2a2a2f;border-radius:5px;background:none;color:#9a9aaa;font-size:11px;padding:2px 8px;cursor:pointer;white-space:nowrap}'
    +'.addb:hover{color:#16161a;background:#ececf0;border-color:#ececf0}'
    /* レイヤーパネル（FBと同じ挙動） */
-   +'.fb-layers{width:152px;border-left:1px solid rgba(92,214,230,.5);box-shadow:-1px 0 10px rgba(92,214,230,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
+   +'.fb-layers{width:152px;border-left:1px solid rgba(96,165,255,.5);box-shadow:-1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.fb-layers-head{font-size:10px;font-weight:700;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:10px 10px 6px}'
    +'.fb-layers-list{flex:1;overflow-y:auto;padding:0 8px 8px;display:flex;flex-direction:column;gap:6px}'
    +'.lyr-card{border:1px solid #2a2a2f;border-radius:8px;background:#1c1c1f;cursor:pointer;overflow:hidden;flex-shrink:0}'
@@ -1335,7 +1397,7 @@ function openReel(){
    +'.lyr-add{margin:2px 0 10px;padding:7px;border:1px dashed #3a3a42;border-radius:8px;color:#5a5a6a;font-size:12px;cursor:pointer;background:none}'
    +'.lyr-add:hover{color:#e8e8ec;border-color:#e8e8ec}'
    /* コメントパネル（FBと同じ挙動・noteBlock共用） */
-   +'.fb-side{width:320px;border-left:1px solid rgba(92,214,230,.5);box-shadow:-1px 0 10px rgba(92,214,230,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
+   +'.fb-side{width:320px;border-left:1px solid rgba(96,165,255,.5);box-shadow:-1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.fb-side-head{font-size:10px;font-weight:700;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:12px 14px 8px}'
    +'.fb-notes{flex:1;overflow-y:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}'
    +'.fb-input{padding:12px;border-top:1px solid #2a2a2f;display:flex;gap:8px}'
@@ -1355,7 +1417,7 @@ function openReel(){
    +'.btn-sm{padding:4px 9px;font-size:12px}'
    +'.btn-ghost{border:1px solid #2a2a2f;color:#9a9aaa}'
    +'.note-shot{width:100%;display:block;border:1px solid #2a2a2f;border-radius:6px;margin-top:6px;background:#000}'
-   +'.hd{border-bottom:1px solid rgba(92,214,230,.5);box-shadow:0 1px 10px rgba(92,214,230,.14)}';
+   +'.hd{border-bottom:1px solid rgba(96,165,255,.5);box-shadow:0 1px 10px rgba(96,165,255,.14)}';
   d.head.appendChild(st);
   /* ヘッダ */
   const hd=ce(d,'div','hd');
@@ -1363,9 +1425,22 @@ function openReel(){
   hd.appendChild(ce(d,'span','sub','シーケンスプレイヤー — メインから動画を送って並べる'));
   hd.appendChild(ce(d,'div','sp'));
   const totalLab=ce(d,'span','sub','計 0:00');hd.appendChild(totalLab);
+  const saveReelBtn=ce(d,'button','btn','💾 リール保存');saveReelBtn.title='この並びを保存（動画タイルから再オープン可能）';hd.appendChild(saveReelBtn);
   const loopBtn=ce(d,'button','btn','ループ');hd.appendChild(loopBtn);
   const clearBtn=ce(d,'button','btn','全クリア');hd.appendChild(clearBtn);
   d.body.appendChild(hd);
+  saveReelBtn.onclick=async()=>{
+    if(!reelUI.clips.length)return;
+    let r=DB.reels.find(x=>x.id===reelUI.reelId);
+    const name=reelWin.prompt('リール名',r?r.name:('Reel '+(DB.reels.length+1)));
+    if(!name)return;
+    const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
+    if(r){r.name=name;r.clips=clips}
+    else{r={id:newId('reel'),name,clips,createdAt:nowIso()};DB.reels.push(r);reelUI.reelId=r.id}
+    await persist();
+    saveReelBtn.textContent='保存済 ✓';setTimeout(()=>{saveReelBtn.textContent='💾 リール保存'},900);
+    try{render();resolveThumbs()}catch(_){}
+  };
   /* 4カラム: ショットリスト | メイン | レイヤー | コメント */
   const rowEl=ce(d,'div');rowEl.style.cssText='flex:1;display:flex;min-height:0';
   const rside=ce(d,'div','rside');
@@ -1530,7 +1605,7 @@ function openReel(){
       const cf=clipFrames(c);const x0=off*fw;
       if(i%2){ctx.fillStyle='rgba(255,255,255,.035)';ctx.fillRect(x0,0,cf*fw,H)}
       /* クリップ境界と名前 */
-      ctx.strokeStyle='rgba(92,214,230,.55)';ctx.beginPath();ctx.moveTo(Math.round(x0)+.5,0);ctx.lineTo(Math.round(x0)+.5,H);ctx.stroke();
+      ctx.strokeStyle='rgba(96,165,255,.55)';ctx.beginPath();ctx.moveTo(Math.round(x0)+.5,0);ctx.lineTo(Math.round(x0)+.5,H);ctx.stroke();
       ctx.fillStyle=i===reelUI.cur?'#e8e8ec':'rgba(255,255,255,.4)';ctx.font='9px monospace';
       ctx.fillText((i+1)+'. '+c.name.slice(0,16),x0+3,8);
       /* 各動画のフレーム目盛り */
@@ -1665,17 +1740,33 @@ function openReel(){
     const revs=DB.nodes.filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
     if(!revs.length){rlist.appendChild(ce(d,'div','pth','動画のあるレビューページがありません'));return}
     for(const n of revs){
-      const latest=[...n.versions].reverse().find(x=>x.type==='video');
+      const vids=n.versions.filter(x=>x.type==='video');
+      const latest=vids[vids.length-1];
       const card=ce(d,'div','snode');
       card.appendChild(ce(d,'div','pth',pathStr(n.id)));
       const r2=ce(d,'div','nm2');
+      const tg=ce(d,'button','addb','▸');tg.title='中の動画（バージョン）を表示';
+      r2.appendChild(tg);
       r2.appendChild(ce(d,'span',null,'🎬 '+n.name));
       r2.appendChild(ce(d,'span','sp2'));
       r2.appendChild(ce(d,'span','pth',latest.name));
-      const add=ce(d,'button','addb','＋ 追加');
+      const add=ce(d,'button','addb','＋ 追加');add.title='最新の動画を追加';
       add.onclick=async ev=>{ev.stopPropagation();await reelAddClip(getNode(n.id),latest)};
       r2.appendChild(add);
       card.appendChild(r2);
+      /* ショットの中の動画（全バージョン）を辿って個別に追加できる */
+      const vl=ce(d,'div');vl.style.cssText='display:none;margin-top:5px;border-top:1px solid #2a2a2f;padding-top:5px;display:none';
+      for(const vv of vids){
+        const row=ce(d,'div','nm2');
+        row.appendChild(ce(d,'span','pth','▶ '+vv.name+'（'+(vv.uploadedBy||'-')+'）'));
+        row.appendChild(ce(d,'span','sp2'));
+        const ab=ce(d,'button','addb','＋');
+        ab.onclick=async ev=>{ev.stopPropagation();await reelAddClip(getNode(n.id),vv)};
+        row.appendChild(ab);
+        vl.appendChild(row);
+      }
+      card.appendChild(vl);
+      tg.onclick=ev=>{ev.stopPropagation();const on=vl.style.display==='none';vl.style.display=on?'block':'none';tg.textContent=on?'▾':'▸'};
       rlist.appendChild(card);
     }
   }
@@ -1735,6 +1826,17 @@ async function sendToReel(node,v){
   openReel();if(!reelAlive())return;
   await reelAddClip(node,v);
   toast('REEL に送りました: '+node.name+' '+v.name);
+}
+/* 保存済みリールを開く（動画タイルの 🎞 リール名 ボタンから） */
+async function openReelFromSaved(reelId){
+  const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
+  openReel();if(!reelAlive())return;
+  reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;
+  for(const ref of r.clips){
+    const n=getNode(ref.nodeId);const vv=n&&n.versions.find(x=>x.id===ref.vId);
+    if(n&&vv)await reelAddClip(n,vv);
+  }
+  if(reelUI.loadCur)reelUI.loadCur(false);
 }
 
 /* ============================================================
