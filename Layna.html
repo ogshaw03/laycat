@@ -865,6 +865,10 @@ function openReview(nodeId,versionId){
         ctx.beginPath();ctx.moveTo(cx,2);ctx.lineTo(cx+5,7);ctx.lineTo(cx,12);ctx.lineTo(cx-5,7);ctx.closePath();ctx.fill();
       }
     }
+    /* 未送信の描画のプレビューマーカー（半透明オレンジ） */
+    const pdur=parseInt(durSel.value)||1;
+    ctx.fillStyle='rgba(224,138,74,.5)';
+    for(const p of pending)if(p.f!=null)ctx.fillRect(p.f*fw,2,Math.max(3,fw*pdur),7);
     /* プレイヘッド */
     const f=dispFrame();const x=f*fw+fw/2;
     ctx.fillStyle='rgba(255,255,255,.95)';ctx.fillRect(x-1,0,2,H);
@@ -921,11 +925,14 @@ function openReview(nodeId,versionId){
     }
     /* 現在フレームのアノテーション */
     for(const n of v.review.notes)if(n.drawing&&n.drawing.length&&visibleAt(n,f))paintStrokes(ctx,n.drawing,1);
-    /* 未送信の描画（描いたフレームでのみ表示） */
-    const pend=pending.filter(p=>!isVideo||p.f===f);
-    if(stroke&&(!isVideo||stroke.f===f))pend.push(stroke);
+    /* 未送信の描画（描いたフレームから、選択中の表示F数のあいだ表示） */
+    const pdur=parseInt(durSel.value)||1;
+    const inWin=p=>!isVideo||(p.f!=null&&f>=p.f&&f<p.f+pdur);
+    const pend=pending.filter(inWin);
+    if(stroke&&inWin(stroke))pend.push(stroke);
     paintStrokes(ctx,pend,1);
   }
+  durSel.onchange=()=>{drawAll();drawTimeline()};
   ghostBtn.onclick=()=>{ghostOn=!ghostOn;ghostBtn.classList.toggle('active',ghostOn);drawAll()};
   const pt=e=>{const r=canvas.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
   drawBtn.onclick=()=>{drawMode=!drawMode;drawBtn.classList.toggle('active',drawMode);canvas.style.pointerEvents=drawMode?'auto':'none';if(drawMode&&isVideo)media.pause()};
