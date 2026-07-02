@@ -308,6 +308,7 @@ textarea.form-input{height:70px;resize:vertical}
   <button class="home-btn" id="homeBtn" title="トップへ">◐</button>
   <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
   <div class="header-actions">
+    <button class="btn btn-ghost" id="shotListBtn" title="ショットリスト — 全ショットの最新動画をタイル一覧（別ウィンドウ）">📋 ショット</button>
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）">🎞 REEL</button>
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
@@ -335,6 +336,13 @@ textarea.form-input{height:70px;resize:vertical}
    階層の数・名前はユーザーが自由に作成。保存はローカルフォルダ。
    ============================================================ */
 
+const DEFAULT_STATUSES=[
+  {id:'pending',label:'チェック待ち',color:'#9a9ab0'},
+  {id:'approved',label:'OK',color:'#5affa0'},
+  {id:'retake',label:'リテイク',color:'#ffb85a'},
+  {id:'rejected',label:'NG',color:'#ff5a5a'},
+];
+function hexA(hex,a){const m=/^#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})/.exec(hex||'')||[];return 'rgba('+parseInt(m[1]||'7a',16)+','+parseInt(m[2]||'7a',16)+','+parseInt(m[3]||'90',16)+','+a+')'}
 const STATUS={
   empty:{label:'—',cls:'empty',color:'#3a3a42'},
   pending:{label:'チェック待ち',cls:'pending',color:'#8a8a92'},
@@ -396,17 +404,28 @@ const getNode=id=>DB.nodes.find(n=>n.id===id)||null;
 const childrenOf=id=>DB.nodes.filter(n=>n.parentId===id).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
 function pathOf(id){const p=[];let n=getNode(id);while(n){p.unshift(n);n=n.parentId?getNode(n.parentId):null}return p}
 function descendants(id){const out=[];const walk=pid=>{for(const c of childrenOf(pid)){out.push(c);walk(c.id)}};walk(id);return out}
+/* プロジェクト（ルート）ごとのステータス定義。未設定はデフォルト4種 */
+function projStatuses(node){
+  let n=node;
+  while(n&&n.parentId){const p=getNode(n.parentId);if(!p)break;n=p}
+  return (n&&Array.isArray(n.statuses)&&n.statuses.length)?n.statuses:DEFAULT_STATUSES;
+}
 function nodeStatus(node){
-  /* レビューページはページ単位のステータス */
-  if(node.type==='review')return (node.versions&&node.versions.length)?(node.status||'pending'):'empty';
+  if(node.type==='review'){
+    if(!(node.versions&&node.versions.length))return 'empty';
+    return node.status||projStatuses(node)[0].id;
+  }
   const ch=childrenOf(node.id);
   if(!ch.length)return 'empty';
-  const sts=ch.map(nodeStatus);
-  if(sts.every(s=>s==='approved'))return 'approved';
-  if(sts.some(s=>s==='rejected'))return 'rejected';
-  if(sts.some(s=>s==='retake'))return 'retake';
-  if(sts.some(s=>s!=='empty'))return 'pending';
-  return 'empty';
+  const sts=ch.map(nodeStatus).filter(s=>s!=='empty');
+  if(!sts.length)return 'empty';
+  if(sts.every(s=>s===sts[0]))return sts[0];
+  return projStatuses(node)[0].id; /* 混在は先頭ステータス扱い */
+}
+function stInfo(node){
+  const id=nodeStatus(node);
+  if(id==='empty')return{label:'—',color:'#5a5a6a'};
+  return projStatuses(node).find(s=>s.id===id)||{label:'—',color:'#5a5a6a'};
 }
 function reviewToStatus(st){return st}
 
@@ -483,7 +502,7 @@ function renderTreeNode(container,node,depth){
   const tg=el('span','tree-toggle'+(state.expanded.has(node.id)?' open':''),kids.length?'▶':'');
   if(kids.length)tg.onclick=e=>{e.stopPropagation();if(state.expanded.has(node.id))state.expanded.delete(node.id);else state.expanded.add(node.id);renderSidebar()};
   row.appendChild(tg);
-  const dot=el('span','tree-dot');dot.style.background=STATUS[nodeStatus(node)].color;row.appendChild(dot);
+  const dot=el('span','tree-dot');dot.style.background=stInfo(node).color;row.appendChild(dot);
   const ico=el('span',null,node.type==='review'?'🎬':'📁');ico.style.cssText='font-size:11px;flex-shrink:0';row.appendChild(ico);
   row.appendChild(el('span','tree-name',node.name));
   if(node.type==='review'&&node.versions.length)row.appendChild(el('span','tree-badge','▶'+node.versions.length));
@@ -507,18 +526,22 @@ function renderMainHead(){
   const title=el('h1');
   if(cur){
     title.appendChild(document.createTextNode(cur.name));
-    const st=STATUS[nodeStatus(cur)];title.appendChild(el('span','badge badge-'+st.cls,st.label));
+    const st=stInfo(cur);const bg=el('span','badge',st.label);bg.style.background=hexA(st.color,.18);bg.style.color=st.color;title.appendChild(bg);
     title.appendChild(el('span','type-chip',cur.type==='review'?'🎬 レビュー':'📁 セクション'));
   }else title.textContent='プロジェクト一覧';
   box.appendChild(title);
   if(cur&&cur.description)box.appendChild(el('div','desc',cur.description));
   h.appendChild(box);h.appendChild(el('div','spacer'));
   if(cur&&cur.type==='review'&&cur.versions.length){
-    /* レビューページ単位のステータス設定 */
+    /* レビューページ単位のステータス設定（プロジェクトのカスタム定義から生成） */
     const ra=el('span','review-actions');ra.style.margin='0';
-    const mkS=(l,c,s)=>{const b=el('button','btn btn-sm '+c,l);b.onclick=async()=>{cur.status=s;await persist();render();resolveThumbs()};return b};
-    ra.appendChild(mkS('OK','ok','approved'));ra.appendChild(mkS('リテイク','retake','retake'));
-    ra.appendChild(mkS('NG','reject','rejected'));ra.appendChild(mkS('保留','btn-ghost','pending'));
+    for(const stt of projStatuses(cur)){
+      const b=el('button','btn btn-sm btn-ghost',stt.label);
+      b.style.borderColor=stt.color;b.style.color=stt.color;
+      if(nodeStatus(cur)===stt.id)b.style.background=hexA(stt.color,.2);
+      b.onclick=async()=>{cur.status=stt.id;await persist();render();resolveThumbs()};
+      ra.appendChild(b);
+    }
     h.appendChild(ra);
   }
   if(cur){
@@ -590,7 +613,7 @@ function nodeCard(node,isRoot){
     }
   }
   else{const ni=el('div','vcard-noimg');ni.appendChild(el('div','g',isRev?'🎬':'▦'));ni.appendChild(el('div','lab',isRev?(node.versions.length?node.versions.length+' 本':'レビュー'):(kids.length?kids.length+' 項目':'空セクション')));tw.appendChild(ni)}
-  const st=STATUS[nodeStatus(node)];tw.appendChild(el('div','vcard-badge badge-'+st.cls,st.label));
+  const stI=stInfo(node);const bdg=el('div','vcard-badge',stI.label);bdg.style.background=hexA(stI.color,.85);bdg.style.color='#101013';tw.appendChild(bdg);
   if(isRev){if(node.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+node.versions.length))}
   else if(kids.length)tw.appendChild(el('div','vcard-cnt','📁 '+kids.length));
   const a=el('div','vcard-actions');const d=el('button','vcard-act','🗑');d.title='削除';d.onclick=e=>{e.stopPropagation();deleteNode(node)};a.appendChild(d);tw.appendChild(a);
@@ -807,8 +830,9 @@ function logItem(node,v){
   if(!arr.length)notes.appendChild(el('div','log-empty-note','フレームコメントはまだありません。FB画面（⤢）または下の入力から。'));
   for(const n of arr)notes.appendChild(noteBlock(v,n,{refresh,onSeek:seekInline,shot}));
   side.appendChild(notes);
-  /* 右側の入力は「動画の現在フレーム」に紐づく */
-  side.appendChild(mkInput('現在のフレームにコメント…',v.type==='video'?()=>{const vd=media.querySelector('video');return vd?Math.round((vd.currentTime||0)*(v.fps||24)):0}:null));
+  /* フレームコメントの追加はFB画面（⤢）からのみ */
+  const hint=el('div','log-empty-note','フレームへのコメント・アノテーションは ⤢（FB画面）から');
+  hint.style.padding='8px 12px';side.appendChild(hint);
   flexw.appendChild(side);
   it.appendChild(flexw);
   return it;
@@ -885,8 +909,30 @@ function openRename(node){
     if(kids||vers)inner.appendChild(el('div','form-label','※ 種別を変えてもデータは消えません（レビューにすると子項目は非表示、セクションにすると動画ログは非表示になります）。現在: 子'+kids+'件 / 動画'+vers+'本'));
     const descRow=frow('説明','textarea');descRow.f.value=node.description||'';
     inner.appendChild(descRow.r);
+    /* プロジェクト（ルート）ならステータスを自由に編集できる */
+    let stArr=null;
+    if(!node.parentId){
+      inner.appendChild(el('div','form-label','ステータス定義（このプロジェクト全体で使用）'));
+      const stWrap=el('div','step-grid');
+      stArr=(node.statuses&&node.statuses.length?node.statuses:DEFAULT_STATUSES).map(x=>({...x}));
+      const redrawSt=()=>{
+        stWrap.innerHTML='';
+        stArr.forEach((st2,i)=>{
+          const row=el('div','step-row');
+          const color=el('input');color.type='color';color.value=st2.color;color.style.cssText='width:36px;height:30px;background:none;border:none';color.oninput=()=>st2.color=color.value;
+          const nm=el('input','form-input');nm.value=st2.label;nm.oninput=()=>st2.label=nm.value;
+          const del=el('button','btn btn-danger btn-sm','削除');del.onclick=()=>{stArr.splice(i,1);redrawSt()};
+          row.appendChild(color);row.appendChild(nm);row.appendChild(del);stWrap.appendChild(row);
+        });
+      };
+      redrawSt();
+      inner.appendChild(stWrap);
+      const addSt=el('button','btn btn-ghost btn-sm','＋ ステータスを追加');addSt.style.marginBottom='12px';
+      addSt.onclick=()=>{stArr.push({id:newId('st'),label:'新ステータス',color:'#60a5ff'});redrawSt()};
+      inner.appendChild(addSt);
+    }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();await persist();closeModal();render();resolveThumbs()};
+    const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));await persist();closeModal();render();resolveThumbs()};
     mFoot(body,[cancel,save]);
   });
 }
@@ -906,7 +952,8 @@ async function deleteNode(node){
 /* ============================================================
    アップロード / レビュー
    ============================================================ */
-async function uploadVersion(node,file,ui){
+async function uploadVersion(node,file,ui,opts){
+  opts=opts||{};
   ui.prog.classList.remove('hidden');ui.pct.textContent='サムネイル生成中...';ui.bi.style.width='30%';
   const isVideo=file.type.startsWith('video/');
   try{
@@ -914,10 +961,33 @@ async function uploadVersion(node,file,ui){
     const ext=(file.name.match(/\.[^.]+$/)||[''])[0];const id=newId('media');
     const mediaRef=await storage.putMedia('media',id+ext,file);
     let thumbRef=null;if(thumbDataUrl){const blob=await(await fetch(thumbDataUrl)).blob();thumbRef=await storage.putMedia('thumbnails',id+'.jpg',blob)}else if(!isVideo)thumbRef=mediaRef;
-    const version={id:newId('ver'),name:'v'+String(node.versions.length+1).padStart(2,'0'),type:isVideo?'video':'image',file:mediaRef,thumb:thumbRef,uploadedBy:currentUser(),uploadedAt:nowIso(),review:{status:'pending',notes:[]}};
+    /* 名前：入力があればそれ、空欄なら動画のタイトル（拡張子なしのファイル名） */
+    const vname=(opts.name&&opts.name.trim())||file.name.replace(/\.[^.]+$/,'');
+    const version={id:newId('ver'),name:vname,type:isVideo?'video':'image',file:mediaRef,thumb:thumbRef,uploadedBy:currentUser(),uploadedAt:nowIso(),review:{status:'pending',notes:[]}};
+    if(opts.comment&&opts.comment.trim())version.review.notes.push({author:currentUser(),text:opts.comment.trim(),time:nowIso()});
     node.versions.push(version);if(thumbRef)node.thumbnail=thumbRef;
     await persist();ui.bi.style.width='100%';render();resolveThumbs();toast('アップロード完了: '+version.name);
   }catch(e){ui.prog.classList.add('hidden');toast('アップロード失敗: '+e.message)}
+}
+/* アップロード前の入力モーダル（動画名・コメント） */
+function openUploadModal(node,file){
+  return new Promise(res=>{
+    openModal(body=>{
+      const inner=mHead(body,'動画を追加',file.name);
+      const nameRow=frow('動画名（空欄ならファイル名をそのまま使用）','input');
+      nameRow.f.placeholder=file.name.replace(/\.[^.]+$/,'');
+      const cmtRow=frow('コメント（任意・ショット全体へのコメントとして記録）','textarea');
+      inner.appendChild(nameRow.r);inner.appendChild(cmtRow.r);
+      const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=()=>{closeModal();res(false)};
+      const ok=el('button','btn btn-primary','アップロード');
+      ok.onclick=async()=>{
+        closeModal();
+        await uploadVersion(node,file,curUploadUI||{prog:{classList:{add(){},remove(){}}},bi:{style:{}},pct:{}},{name:nameRow.f.value,comment:cmtRow.f.value});
+        res(true);
+      };
+      mFoot(body,[cancel,ok]);
+    });
+  });
 }
 function genThumb(file){return new Promise(resolve=>{const isVideo=file.type.startsWith('video/');const url=URL.createObjectURL(file);const done=cv=>{URL.revokeObjectURL(url);resolve(cv?cv.toDataURL('image/jpeg',0.72):null)};const draw=(src,w,h)=>{const scale=Math.min(1,640/w);const cv=document.createElement('canvas');cv.width=Math.round(w*scale);cv.height=Math.round(h*scale);cv.getContext('2d').drawImage(src,0,0,cv.width,cv.height);return cv};if(isVideo){const vid=document.createElement('video');vid.preload='metadata';vid.muted=true;vid.src=url;vid.onloadeddata=()=>{try{vid.currentTime=Math.min(1,(vid.duration||2)/2)}catch(_){}}; vid.onseeked=()=>{try{done(draw(vid,vid.videoWidth,vid.videoHeight))}catch(_){done(null)}};vid.onerror=()=>done(null)}else{const img=new Image();img.onload=()=>done(draw(img,img.naturalWidth,img.naturalHeight));img.onerror=()=>done(null);img.src=url}})}
 
@@ -940,14 +1010,17 @@ function openReview(nodeId,versionId){
   const top=el('div','fb-top');
   const back=el('button','btn btn-ghost btn-sm','← 戻る');back.onclick=close;top.appendChild(back);
   const tt=el('div','fb-title',node.name+' — '+v.name);top.appendChild(tt);
-  const stEl=el('span');function updSt(){const st=STATUS[nodeStatus(node)];stEl.className='badge badge-'+st.cls;stEl.textContent=st.label}updSt();
+  const stEl=el('span');function updSt(){const st=stInfo(node);stEl.className='badge';stEl.textContent=st.label;stEl.style.background=hexA(st.color,.18);stEl.style.color=st.color}updSt();
   top.appendChild(stEl);
   top.appendChild(el('span','log-meta','by '+(v.uploadedBy||'-')+'・'+fmt(v.uploadedAt)));
   top.appendChild(el('div','spacer'));
-  /* ステータスはレビューページ（ノード）単位 */
-  const mk=(l,c,s)=>{const b=el('button','btn '+c+' btn-sm',l);b.onclick=async()=>{node.status=s;await persist();updSt()};return b};
-  top.appendChild(mk('OK','ok','approved'));top.appendChild(mk('リテイク','retake','retake'));
-  top.appendChild(mk('NG','reject','rejected'));top.appendChild(mk('保留','btn-ghost','pending'));
+  /* ステータスはレビューページ単位（プロジェクトのカスタム定義から生成） */
+  for(const stt of projStatuses(node)){
+    const b=el('button','btn btn-ghost btn-sm',stt.label);
+    b.style.borderColor=stt.color;b.style.color=stt.color;
+    b.onclick=async()=>{node.status=stt.id;await persist();updSt()};
+    top.appendChild(b);
+  }
   if(isVideo){const rb=el('button','btn btn-ghost btn-sm','🎞');rb.title='REEL に送る';rb.onclick=()=>sendToReel(node,v);top.appendChild(rb)}
   const delBtn=el('button','btn btn-danger btn-sm','🗑');delBtn.title='このバージョンを削除';
   delBtn.onclick=async()=>{if(!confirm(v.name+' を削除しますか？'))return;await storage.delMedia(v.file);await storage.delMedia(v.thumb);node.versions=node.versions.filter(x=>x.id!==v.id);node.thumbnail=node.versions.length?node.versions[node.versions.length-1].thumb:null;await persist();close()};
@@ -1006,12 +1079,16 @@ function openReview(nodeId,versionId){
   const eraseSel=el('select');[8,16,28,44,64].forEach(n=>eraseSel.appendChild(new Option('消し '+n,n)));eraseSel.value='16';eraseSel.title='消しゴムサイズ(px)';
   const undoBtn=el('button','btn btn-ghost btn-sm','↩');undoBtn.title='直前の線を取り消し';
   const clearBtn=el('button','btn btn-ghost btn-sm','クリア');clearBtn.title='未送信の描画を消す';
+  /* ブラシ・消しゴム等の描画ツールは動画の上側に */
+  const tbTop=el('div','fb-controls');
+  tbTop.style.borderTop='none';tbTop.style.borderBottom='1px solid var(--edge)';
+  tbTop.appendChild(drawBtn);tbTop.appendChild(brushSel);tbTop.appendChild(eraserBtn);tbTop.appendChild(eraseSel);tbTop.appendChild(clrRow);tbTop.appendChild(colorIn);
+  if(isVideo){tbTop.appendChild(durSel);tbTop.appendChild(ghostBtn)}
+  tbTop.appendChild(eyeBtn);tbTop.appendChild(traceBtn);tbTop.appendChild(undoBtn);tbTop.appendChild(clearBtn);
+  stage.insertBefore(tbTop,wrap);
+  /* 再生・ズーム系は下側 */
   if(isVideo){ctr.appendChild(playBtn);ctr.appendChild(prevBtn);ctr.appendChild(nextBtn);ctr.appendChild(frameLab);ctr.appendChild(fpsSel)}
-  ctr.appendChild(drawBtn);ctr.appendChild(brushSel);ctr.appendChild(eraserBtn);ctr.appendChild(eraseSel);ctr.appendChild(clrRow);ctr.appendChild(colorIn);
-  if(isVideo){ctr.appendChild(durSel);ctr.appendChild(ghostBtn)}
-  ctr.appendChild(eyeBtn);ctr.appendChild(traceBtn);
   ctr.appendChild(ziBtn);ctr.appendChild(zoBtn);ctr.appendChild(zoomLab);ctr.appendChild(zrBtn);ctr.appendChild(handBtn);
-  ctr.appendChild(undoBtn);ctr.appendChild(clearBtn);
   stage.appendChild(ctr);
   body.appendChild(stage);
 
@@ -1328,6 +1405,86 @@ function openReview(nodeId,versionId){
 }
 
 /* ============================================================
+   ショットリスト（別ウィンドウ）
+   全ショットの最新動画をタイル表示。選択でビューアーに大きく表示。
+   ============================================================ */
+let slWin=null;const slUI={};
+function openShotList(){
+  if(slWin&&!slWin.closed){slWin.focus();slBuild();return}
+  slWin=window.open('','layna_shotlist','width=1240,height=860');
+  if(!slWin){toast('ポップアップがブロックされました。許可してください');return}
+  const d=slWin.document;
+  d.open();d.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>Layna ショットリスト</title></head><body></body></html>');d.close();
+  const st=d.createElement('style');
+  st.textContent='*{margin:0;padding:0;box-sizing:border-box}body{background:#0d0d0f;color:#e8e8ec;font-family:system-ui,"Noto Sans JP",sans-serif;font-size:13px;display:flex;flex-direction:column;height:100vh;overflow:hidden}'
+  +'.hd{display:flex;align-items:center;gap:12px;padding:9px 14px;background:#141416;border-bottom:1px solid rgba(96,165,255,.7);box-shadow:0 1px 10px rgba(96,165,255,.22);flex-shrink:0}'
+  +'.hd .logo{font-weight:700;font-size:16px}.hd .sub{color:#5a5a6a;font-size:11px}.hd .sp{flex:1}'
+  +'.btn{background:none;border:1px solid #2a2a2f;color:#9a9aaa;border-radius:6px;padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap}.btn:hover{color:#e8e8ec;border-color:#3a3a42}'
+  +'.viewer{flex:1;min-height:0;display:flex;flex-direction:column;background:#000}'
+  +'.viewer .vwrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}'
+  +'.viewer video{max-width:100%;max-height:100%}'
+  +'.vinfo{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#141416;border-top:1px solid #2a2a2f}'
+  +'.vinfo .nm{font-weight:700}.vinfo .pth{color:#5a5a6a;font-size:11px}'
+  +'.gridwrap{height:275px;overflow-y:auto;background:#141416;border-top:1px solid rgba(96,165,255,.7);box-shadow:0 -1px 10px rgba(96,165,255,.22);padding:12px 14px;flex-shrink:0}'
+  +'.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}'
+  +'.tile{border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;cursor:pointer;background:#1c1c1f}'
+  +'.tile:hover{border-color:#3a3a42}.tile.sel{border-color:#e8e8ec}'
+  +'.tile .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#5a5a6a;font-size:22px}'
+  +'.tile .bd{padding:6px 8px}.tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  +'.tile .pth{font-size:10px;color:#5a5a6a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  +'.empty{color:#5a5a6a;padding:40px;text-align:center;grid-column:1/-1}';
+  d.head.appendChild(st);
+  const ce2=(t,c,x)=>{const e=d.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+  const hd=ce2('div','hd');
+  hd.appendChild(ce2('div','logo','📋 ショットリスト / Layna'));
+  hd.appendChild(ce2('span','sub','全ショットの最新動画'));
+  hd.appendChild(ce2('div','sp'));
+  const rf=ce2('button','btn','↻ 更新');hd.appendChild(rf);
+  d.body.appendChild(hd);
+  const viewer=ce2('div','viewer');const vwrap=ce2('div','vwrap');
+  const video=ce2('video');video.controls=true;video.playsInline=true;vwrap.appendChild(video);
+  viewer.appendChild(vwrap);
+  const vinfo=ce2('div','vinfo');const nm=ce2('span','nm','—');const pth=ce2('span','pth','タイルを選択してください');
+  vinfo.appendChild(nm);vinfo.appendChild(pth);viewer.appendChild(vinfo);
+  d.body.appendChild(viewer);
+  const gw=ce2('div','gridwrap');const grid=ce2('div','grid');gw.appendChild(grid);d.body.appendChild(gw);
+  Object.assign(slUI,{ce2,video,nm,pth,grid});
+  rf.onclick=()=>slBuild(false);
+  slBuild(true);
+}
+async function slSelect(n,v,tile){
+  const {video,nm,pth,grid}=slUI;
+  [...grid.querySelectorAll('.tile')].forEach(t=>t.classList.remove('sel'));
+  if(tile)tile.classList.add('sel');
+  nm.textContent=n.name+'　'+v.name;
+  pth.textContent=pathOf(n.id).slice(0,-1).map(x=>x.name).join(' / ')||'—';
+  const url=await storage.getURL(v.file);
+  if(url){video.src=url;video.play().catch(()=>{})}
+}
+function slBuild(autosel){
+  if(!slWin||slWin.closed)return;
+  const {ce2,grid}=slUI;grid.innerHTML='';
+  const revs=DB.nodes.filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
+  if(!revs.length){grid.appendChild(ce2('div','empty','動画のあるショットがありません'));return}
+  let first=null;
+  for(const n of revs){
+    const v=[...n.versions].reverse().find(x=>x.type==='video');
+    const tile=ce2('div','tile');
+    const th=ce2('div','th','🎬');
+    if(v.thumb)storage.getURL(v.thumb).then(u=>{if(u){th.textContent='';th.style.backgroundImage='url("'+u+'")'}});
+    tile.appendChild(th);
+    const bd=ce2('div','bd');
+    bd.appendChild(ce2('div','nm',n.name+'　'+v.name));
+    bd.appendChild(ce2('div','pth',pathOf(n.id).slice(0,-1).map(x=>x.name).join(' / ')||'—'));
+    tile.appendChild(bd);
+    tile.onclick=()=>slSelect(n,v,tile);
+    grid.appendChild(tile);
+    if(!first)first={n,v,tile};
+  }
+  if(autosel&&first)slSelect(first.n,first.v,first.tile);
+}
+
+/* ============================================================
    REEL — シーケンスプレイヤー（別ウィンドウ）
    メインから動画を送り、タイムラインに並べて順番に再生する。
    ============================================================ */
@@ -1482,7 +1639,11 @@ function openReel(){
   const durS=d.createElement('select');[[1,'表示 1F'],[2,'表示 2F'],[3,'表示 3F'],[5,'表示 5F'],[10,'表示 10F'],[9999,'持続']].forEach(([v2,l])=>opt(durS,l,v2));
   const eyeB=mkB('👁','アノテーション表示/非表示');eyeB.classList.add('on');
   const undoB=mkB('↩'),clrB=mkB('クリア');
-  [pF,nF,fLab,fpsS,drawB,brushS,eraseB,eraseS,clrs,colorI,durS,eyeB,undoB,clrB].forEach(x=>fbar.appendChild(x));
+  /* 描画ツールは動画の上側、フレーム操作は下側 */
+  const fbarTop=ce(d,'div','ctr');fbarTop.style.cssText='border-top:none;border-bottom:1px solid rgba(96,165,255,.7)';
+  [drawB,brushS,eraseB,eraseS,clrs,colorI,durS,eyeB,undoB,clrB].forEach(x=>fbarTop.appendChild(x));
+  maincol.insertBefore(fbarTop,stage);
+  [pF,nF,fLab,fpsS].forEach(x=>fbar.appendChild(x));
   maincol.appendChild(fbar);
   const ftlWrap=ce(d,'div','ftlwrap');const ftl=ce(d,'canvas','ftl');ftlWrap.appendChild(ftl);
   maincol.appendChild(ftlWrap);
@@ -1514,9 +1675,10 @@ function openReel(){
   const lyrCards=[];
   function buildLayerPanel(){
     const dt=rvData();
-    RV.layerCount=1;
-    if(dt)for(const n of dt.v.review.notes)for(const s of (n.drawing||[]))RV.layerCount=Math.max(RV.layerCount,s.layer||1);
-    for(const p of RV.pending)RV.layerCount=Math.max(RV.layerCount,p.layer||1);
+    let dataMax=1;
+    if(dt)for(const n of dt.v.review.notes)for(const s of (n.drawing||[]))dataMax=Math.max(dataMax,s.layer||1);
+    for(const p of RV.pending)dataMax=Math.max(dataMax,p.layer||1);
+    RV.layerCount=Math.max(RV.layerCount||1,dataMax);
     if(RV.activeLayer>RV.layerCount)RV.activeLayer=RV.layerCount;
     lyrList.innerHTML='';lyrCards.length=0;
     for(let i=1;i<=RV.layerCount;i++){
@@ -1655,7 +1817,7 @@ function openReel(){
     const cand=[],rest=[];
     for(const p of RV.pending)((p.f!=null&&f>=p.f&&f<p.f+pdur)?cand:rest).push(p);
     const res=eraseFromList(cand,x,y,r,anno.height/anno.width,RV.activeLayer);
-    if(res){RV.pending=rest.concat(res);drawAnno();drawFTL()}
+    if(res){RV.pending.splice(0,RV.pending.length,...rest,...res);drawAnno();drawFTL()}
   }
   anno.onpointerdown=e=>{
     if(RV.tool==='draw'){anno.setPointerCapture(e.pointerId);RV.stroke={color:colorI.value,points:[ptA(e)],f:dispF(),layer:RV.activeLayer,w:(parseInt(brushS.value)||4)/anno.width}}
@@ -1669,7 +1831,7 @@ function openReel(){
   durS.onchange=()=>{drawAnno();drawFTL()};
   eyeB.onclick=()=>{RV.eye=!RV.eye;eyeB.classList.toggle('on',RV.eye);drawAnno()};
   undoB.onclick=()=>{RV.pending.pop();drawAnno();drawFTL()};
-  clrB.onclick=()=>{RV.pending=[];RV.stroke=null;drawAnno();drawFTL()};
+  clrB.onclick=()=>{RV.pending.splice(0,RV.pending.length);RV.stroke=null;drawAnno();drawFTL()};
   /* コメント送信（FBと同じ。各レビューページへ即反映） */
   const reelSend=async()=>{
     const dt=rvData();if(!dt)return;
@@ -1677,7 +1839,7 @@ function openReel(){
     if(!txt&&!RV.pending.length)return;
     const n={author:currentUser(),text:txt||'（描画のみ）',time:nowIso(),frame:RV.pending.length?RV.pending[0].f:dispF()};
     if(RV.pending.length){n.drawing=RV.pending.map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}));n.dur=parseInt(durS.value)||1}
-    dt.v.review.notes.push(n);RV.pending=[];RV.stroke=null;cta.value='';
+    dt.v.review.notes.push(n);RV.pending.splice(0,RV.pending.length);RV.stroke=null;cta.value='';
     await persist();drawAnno();drawFTL();reelNotes();
     /* メインウィンドウのレビューページへ反映 */
     try{render();resolveThumbs()}catch(_){}
@@ -1698,8 +1860,9 @@ function openReel(){
   const total=()=>cs().reduce((a,c)=>a+(c.dur||0),0);
   function loadCur(auto){
     const c=cs()[reelUI.cur];
-    /* クリップ切替でレビュー状態をリセット＋パネル再構築 */
-    RV.pending=[];RV.stroke=null;RV.last=-1;
+    /* クリップ切替：未送信アノテはクリップごとに保持（跨いでも消えない） */
+    RV.pending=(c&&(c.pending||(c.pending=[])))||[];
+    RV.stroke=null;RV.last=-1;RV.layerCount=1;
     const dt=rvData();RV.FPS=dt?(dt.v.fps||24):24;fpsS.value=String(RV.FPS);
     buildLayerPanel();reelNotes();
     if(!c){video.removeAttribute('src');video.load();reelRender();return}
@@ -1842,12 +2005,13 @@ async function openReelFromSaved(reelId){
 /* ============================================================
    初期化
    ============================================================ */
-function triggerUpload(node){const fi=document.createElement('input');fi.type='file';fi.accept='image/*,video/*';fi.onchange=()=>{if(fi.files[0])uploadVersion(node,fi.files[0],curUploadUI||{prog:{classList:{add(){}}},bi:{style:{}},pct:{}})};fi.click()}
+function triggerUpload(node){const fi=document.createElement('input');fi.type='file';fi.accept='image/*,video/*';fi.onchange=()=>{if(fi.files[0])openUploadModal(node,fi.files[0])};fi.click()}
 function headerAdd(){const cur=state.currentId?getNode(state.currentId):null;if(cur&&cur.type==='review')triggerUpload(cur);else openAddModal(state.currentId)}
 $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 $('#folderStatus').onclick=connectFlow;
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
+$('#shotListBtn').onclick=()=>{if(storage.mode)openShotList()};
 
 /* エクスプローラーからの D&D アップロード（レビューページ表示中のみ） */
 let dragDepth=0;
@@ -1864,8 +2028,7 @@ window.addEventListener('drop',async e=>{
   if(!node)return;e.preventDefault();
   const files=[...(e.dataTransfer?.files||[])].filter(f=>f.type.startsWith('video/')||f.type.startsWith('image/'));
   if(!files.length){toast('動画・画像ファイルをドロップしてください');return}
-  for(const f of files)await uploadVersion(node,f,curUploadUI||{prog:{classList:{add(){},remove(){}}},bi:{style:{}},pct:{}});
-  toast(files.length+'件をアップロードしました');
+  for(const f of files)await openUploadModal(node,f);
 });
 $('#searchInput').oninput=e=>{state.search=e.target.value;renderBody();resolveThumbs()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
