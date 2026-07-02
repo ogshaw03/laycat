@@ -123,8 +123,29 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .log-item:hover{border-color:var(--border2)}
 .log-media{position:relative;background:#000;cursor:pointer}
 .log-media video,.log-media img{width:100%;display:block;max-height:50vh;object-fit:contain;background:#000}
-.log-open{position:absolute;top:8px;right:8px;z-index:3;width:30px;height:30px;border-radius:6px;background:rgba(0,0,0,.65);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.2)}
+.log-open{position:absolute;top:8px;right:8px;z-index:6;width:30px;height:30px;border-radius:6px;background:rgba(0,0,0,.65);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.2)}
 .log-open:hover{background:rgba(255,255,255,.18)}
+
+/* カスタム動画プレイヤー（タイル内） */
+.vp-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:52px;color:rgba(255,255,255,.85);text-shadow:0 4px 18px rgba(0,0,0,.8);pointer-events:none;z-index:3;transition:opacity .2s,transform .2s}
+.vp-center.off{opacity:0;transform:scale(1.4)}
+.vp-bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;padding:10px 14px 9px 10px;background:linear-gradient(transparent,rgba(0,0,0,.88));opacity:0;transition:opacity .18s;z-index:5}
+.log-media:hover .vp-bar{opacity:1}
+.vp-play{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.45);background:rgba(0,0,0,.45);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);flex-shrink:0;transition:all .15s}
+.vp-play:hover{background:rgba(255,255,255,.16);border-color:#fff;transform:scale(1.06)}
+.vp-time{font-family:monospace;font-size:11px;color:rgba(255,255,255,.85);min-width:82px;text-align:center;letter-spacing:.5px}
+.vp-track{flex:1;height:20px;display:flex;align-items:center;cursor:pointer;position:relative}
+.vp-track .ticks{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:9px;display:flex;justify-content:space-between;pointer-events:none}
+.vp-track .ticks i{width:1px;height:100%;background:rgba(255,255,255,.18)}
+.vp-track .rail{width:100%;height:3px;background:rgba(255,255,255,.22);border-radius:2px;position:relative}
+.vp-track .fill{position:absolute;left:0;top:0;bottom:0;background:#fff;border-radius:2px}
+.vp-track .knob{position:absolute;top:50%;width:9px;height:9px;background:#fff;transform:translate(-50%,-50%) rotate(45deg);box-shadow:0 0 8px rgba(255,255,255,.55)}
+
+/* エクスプローラーからの D&D アップロード */
+.drop-overlay{position:fixed;inset:12px;z-index:1300;background:rgba(13,13,15,.85);border:2px dashed rgba(255,255,255,.75);border-radius:16px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.drop-overlay .dz{text-align:center;color:#e8e8ec;font-size:17px;line-height:2}
+.drop-overlay .dz small{color:var(--text2);font-size:12px}
+.drop-overlay .dz .big{font-size:44px;display:block;margin-bottom:6px}
 .log-media .ph{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:34px}
 .log-head{display:flex;align-items:center;gap:10px;padding:12px 16px 0}
 .log-title{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px;flex:1;min-width:0}
@@ -272,6 +293,7 @@ textarea.form-input{height:70px;resize:vertical}
   </main>
 </div>
 <div class="modal-overlay hidden" id="modal"><div class="modal" id="modalBody"></div></div>
+<div class="drop-overlay hidden" id="dropOverlay"><div class="dz"><span class="big">◐</span>ここにドロップしてアップロード<br><small>動画・画像ファイル（複数可）— このレビューのログに追加されます</small></div></div>
 
 <script>
 'use strict';
@@ -529,6 +551,42 @@ function nodeCard(node){
   card.appendChild(tw);card.onclick=()=>go(node.id);return card;
 }
 
+/* カスタム動画プレイヤー（◐再生ボタン＋ダイヤノブのシークバー） */
+function buildVPlayer(media,vid){
+  const fmtT=s=>{s=Math.max(0,s||0);return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')};
+  const center=el('div','vp-center','◐');
+  const bar=el('div','vp-bar');
+  const play=el('button','vp-play','◐');play.title='再生 / 停止';
+  const time=el('span','vp-time','0:00 / 0:00');
+  const track=el('div','vp-track');
+  const ticks=el('div','ticks');for(let i=0;i<13;i++)ticks.appendChild(el('i'));
+  const rail=el('div','rail');const fill=el('div','fill');const knob=el('div','knob');
+  rail.appendChild(fill);rail.appendChild(knob);
+  track.appendChild(ticks);track.appendChild(rail);
+  bar.appendChild(play);bar.appendChild(track);bar.appendChild(time);
+  media.appendChild(center);media.appendChild(bar);
+  function update(){
+    const d=vid.duration||0,c=vid.currentTime||0,p=d?(c/d*100):0;
+    fill.style.width=p+'%';knob.style.left=p+'%';
+    time.textContent=fmtT(c)+' / '+fmtT(d);
+  }
+  vid.addEventListener('loadedmetadata',update);
+  vid.addEventListener('timeupdate',update);
+  vid.addEventListener('play',()=>{center.classList.add('off');play.textContent='❚❚';
+    (function loop(){if(vid.paused||vid.ended)return;update();requestAnimationFrame(loop)})()});
+  vid.addEventListener('pause',()=>{center.classList.remove('off');play.textContent='◐';update()});
+  vid.addEventListener('ended',()=>{center.classList.remove('off');play.textContent='◐'});
+  const toggle=()=>{if(vid.paused)vid.play().catch(()=>{});else vid.pause()};
+  play.onclick=e=>{e.stopPropagation();toggle()};
+  vid.addEventListener('click',toggle);
+  const seek=e=>{const r=track.getBoundingClientRect();const p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));if(vid.duration){vid.currentTime=p*vid.duration;update()}};
+  let drag=false;
+  track.onpointerdown=e=>{e.stopPropagation();drag=true;track.setPointerCapture(e.pointerId);seek(e)};
+  track.onpointermove=e=>{if(drag)seek(e)};
+  track.onpointerup=()=>{drag=false};
+  return {update};
+}
+
 /* 共通コメントブロック（編集・削除・フレームジャンプ対応） */
 function noteBlock(v,n,opts){
   opts=opts||{};
@@ -570,8 +628,9 @@ function logItem(node,v){
   const media=el('div','log-media');
   if(v.type==='video'){
     const vid=el('video');vid.dataset.vref=v.file;if(v.thumb)vid.dataset.poster=v.thumb;
-    vid.controls=true;vid.preload='metadata';vid.playsInline=true;
+    vid.preload='metadata';vid.playsInline=true;
     media.appendChild(vid);
+    buildVPlayer(media,vid);
   }else{
     const img=el('img');img.dataset.ref=v.file;img.alt=v.name;
     img.style.cursor='zoom-in';img.onclick=()=>openReview(node.id,v.id);
@@ -1185,6 +1244,25 @@ $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 $('#folderStatus').onclick=connectFlow;
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
+
+/* エクスプローラーからの D&D アップロード（レビューページ表示中のみ） */
+let dragDepth=0;
+const dropCtx=()=>{if(!storage.mode||!state.currentId)return null;const n=getNode(state.currentId);return(n&&n.type==='review')?n:null};
+window.addEventListener('dragenter',e=>{
+  if(!dropCtx()||![...(e.dataTransfer?.types||[])].includes('Files'))return;
+  e.preventDefault();dragDepth++;$('#dropOverlay').classList.remove('hidden');
+});
+window.addEventListener('dragover',e=>{if(dropCtx())e.preventDefault()});
+window.addEventListener('dragleave',()=>{if(dragDepth>0)dragDepth--;if(!dragDepth)$('#dropOverlay').classList.add('hidden')});
+window.addEventListener('drop',async e=>{
+  const node=dropCtx();
+  dragDepth=0;$('#dropOverlay').classList.add('hidden');
+  if(!node)return;e.preventDefault();
+  const files=[...(e.dataTransfer?.files||[])].filter(f=>f.type.startsWith('video/')||f.type.startsWith('image/'));
+  if(!files.length){toast('動画・画像ファイルをドロップしてください');return}
+  for(const f of files)await uploadVersion(node,f,curUploadUI||{prog:{classList:{add(){},remove(){}}},bi:{style:{}},pct:{}});
+  toast(files.length+'件をアップロードしました');
+});
 $('#searchInput').oninput=e=>{state.search=e.target.value;renderBody();resolveThumbs()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 async function startAppFlow(){
