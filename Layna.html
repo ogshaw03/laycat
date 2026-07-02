@@ -794,19 +794,33 @@ function openReview(nodeId,versionId){
   let scrubbing=false,scrubTarget=-1,seekBusy=false,seekPend=-1;
   const dispFrame=()=>scrubbing&&scrubTarget>=0?scrubTarget:(curFrame()||0);
   function fmtFrame(){frameLab.textContent='F '+dispFrame()+' / '+(totalFrames-1)}
+  let seekGuard=0;
   function seekRT(f){
     f=Math.max(0,Math.min(f,totalFrames-1));
+    const t=f/FPS+0.0001;
+    if(Math.abs(media.currentTime-t)<0.0005){refreshView();return} // 同一時刻はスキップ（seeked不発でも詰まらない）
     if(seekBusy){seekPend=f;return}
-    seekBusy=true;media.currentTime=f/FPS+0.0001;
+    seekBusy=true;
+    clearTimeout(seekGuard);
+    /* seeked が発火しない環境/ケースでも 300ms で自動復帰 */
+    seekGuard=setTimeout(()=>{seekBusy=false;if(seekPend>=0){const p=seekPend;seekPend=-1;seekRT(p)}},300);
+    if(scrubbing&&typeof media.fastSeek==='function'){try{media.fastSeek(t)}catch(_){media.currentTime=t}}
+    else media.currentTime=t;
   }
   function seekFrame(f){if(!isVideo)return;media.pause();seekRT(f)}
   function setupDuration(){totalFrames=Math.max(1,Math.round((media.duration||0)*FPS));fmtFrame();drawTimeline()}
+  /* 1F境界へのスナップ：停止・シーク後は必ずフレームぴったりの時刻に合わせる */
+  function snapToFrame(){
+    if(!isVideo||scrubbing||!media.paused)return;
+    const f=Math.min(totalFrames-1,Math.max(0,Math.round(media.currentTime*FPS)));
+    if(Math.abs(media.currentTime-(f/FPS+0.0001))>(0.02/FPS))seekRT(f);
+  }
   if(isVideo){
     media.addEventListener('loadedmetadata',()=>{setupDuration();fit();sync(true)});
-    media.addEventListener('seeked',()=>{seekBusy=false;if(seekPend>=0){const p=seekPend;seekPend=-1;seekRT(p)}});
+    media.addEventListener('seeked',()=>{clearTimeout(seekGuard);seekBusy=false;if(seekPend>=0){const p=seekPend;seekPend=-1;seekRT(p)}else snapToFrame()});
     playBtn.onclick=()=>{if(media.paused)media.play();else media.pause()};
     media.addEventListener('play',()=>{playBtn.textContent='⏸'});
-    media.addEventListener('pause',()=>{playBtn.textContent='▶'});
+    media.addEventListener('pause',()=>{playBtn.textContent='▶';snapToFrame()});
     prevBtn.onclick=()=>seekFrame(dispFrame()-1);
     nextBtn.onclick=()=>seekFrame(dispFrame()+1);
     fpsSel.onchange=async()=>{FPS=parseInt(fpsSel.value);v.fps=FPS;await persist();setupDuration();sync(true)};
@@ -814,7 +828,7 @@ function openReview(nodeId,versionId){
     const frameFromX=e=>{const r=tl.getBoundingClientRect();return Math.max(0,Math.min(totalFrames-1,Math.floor((e.clientX-r.left)/r.width*totalFrames)))};
     tl.onpointerdown=e=>{scrubbing=true;tl.setPointerCapture(e.pointerId);media.pause();scrubTarget=frameFromX(e);seekRT(scrubTarget);refreshView()};
     tl.onpointermove=e=>{if(!scrubbing)return;const f=frameFromX(e);if(f!==scrubTarget){scrubTarget=f;seekRT(f);refreshView()}};
-    tl.onpointerup=()=>{scrubbing=false;scrubTarget=-1;refreshView()};
+    tl.onpointerup=()=>{const f=scrubTarget;scrubbing=false;scrubTarget=-1;if(f>=0)seekRT(f);refreshView()}; // 離した位置へ精密シーク（1Fスナップ）
   }else{
     media.addEventListener('load',()=>{fit();drawAll()});
   }
@@ -837,9 +851,20 @@ function openReview(nodeId,versionId){
     ctx.strokeStyle='rgba(255,255,255,.4)';ctx.fillStyle='rgba(255,255,255,.55)';ctx.font='9px monospace';ctx.beginPath();
     for(let f=0;f<totalFrames;f+=step){const x=Math.round(f*fw)+.5;ctx.moveTo(x,H-18);ctx.lineTo(x,H);ctx.fillText(String(f),x+3,H-20)}
     ctx.stroke();
-    /* コメント/アノテーションのマーカー（アンバー） */
-    ctx.fillStyle='#d6a95f';
-    for(const n of v.review.notes)if(n.frame!=null)ctx.fillRect(n.frame*fw,3,Math.max(2.5,fw*(n.drawing?parseInt(n.dur)||1:1)),5);
+    /* コメント/アノテーションのマーカー（クリックでそのフレームへ移動） */
+    for(const n of v.review.notes){
+      if(n.frame==null)continue;
+      const x=n.frame*fw;
+      if(n.drawing&&n.drawing.length){
+        /* アノテーション＝オレンジのバー（表示フレーム数分の幅） */
+        ctx.fillStyle='#e08a4a';ctx.fillRect(x,2,Math.max(3,fw*(parseInt(n.dur)||1)),7);
+      }else{
+        /* コメントのみ＝アンバーの菱形 */
+        const cx=x+fw/2;
+        ctx.fillStyle='#ffd070';
+        ctx.beginPath();ctx.moveTo(cx,2);ctx.lineTo(cx+5,7);ctx.lineTo(cx,12);ctx.lineTo(cx-5,7);ctx.closePath();ctx.fill();
+      }
+    }
     /* プレイヘッド */
     const f=dispFrame();const x=f*fw+fw/2;
     ctx.fillStyle='rgba(255,255,255,.95)';ctx.fillRect(x-1,0,2,H);
@@ -896,14 +921,15 @@ function openReview(nodeId,versionId){
     }
     /* 現在フレームのアノテーション */
     for(const n of v.review.notes)if(n.drawing&&n.drawing.length&&visibleAt(n,f))paintStrokes(ctx,n.drawing,1);
-    /* 未送信の描画 */
-    const pend=[...pending];if(stroke)pend.push(stroke);
+    /* 未送信の描画（描いたフレームでのみ表示） */
+    const pend=pending.filter(p=>!isVideo||p.f===f);
+    if(stroke&&(!isVideo||stroke.f===f))pend.push(stroke);
     paintStrokes(ctx,pend,1);
   }
   ghostBtn.onclick=()=>{ghostOn=!ghostOn;ghostBtn.classList.toggle('active',ghostOn);drawAll()};
   const pt=e=>{const r=canvas.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
   drawBtn.onclick=()=>{drawMode=!drawMode;drawBtn.classList.toggle('active',drawMode);canvas.style.pointerEvents=drawMode?'auto':'none';if(drawMode&&isVideo)media.pause()};
-  canvas.onpointerdown=e=>{if(!drawMode)return;canvas.setPointerCapture(e.pointerId);stroke={color:colorIn.value,points:[pt(e)]}};
+  canvas.onpointerdown=e=>{if(!drawMode)return;canvas.setPointerCapture(e.pointerId);stroke={color:colorIn.value,points:[pt(e)],f:dispFrame()}};
   canvas.onpointermove=e=>{if(stroke){stroke.points.push(pt(e));drawAll()}};
   canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;drawAll()}};
   undoBtn.onclick=()=>{pending.pop();drawAll()};
@@ -934,7 +960,12 @@ function openReview(nodeId,versionId){
     if(!txt&&!pending.length)return;
     const n={author:currentUser(),text:txt||'（描画のみ）',time:nowIso()};
     if(isVideo)n.frame=dispFrame();
-    if(pending.length){n.drawing=pending;n.dur=parseInt(durSel.value)||1}
+    if(pending.length){
+      /* 描画は「描いたフレーム」に紐づける */
+      if(isVideo&&pending[0].f!=null)n.frame=pending[0].f;
+      n.drawing=pending.map(p=>({color:p.color,points:p.points}));
+      n.dur=parseInt(durSel.value)||1;
+    }
     v.review.notes.push(n);pending=[];stroke=null;
     await persist();ta.value='';renderNotes();drawAll();drawTimeline();
   };
