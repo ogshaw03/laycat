@@ -3,152 +3,207 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Layna — プロジェクト管理 / レビュー</title>
+<title>Layna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet" />
 <style>
+*{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#0f1218;--bg-2:#161b25;--bg-3:#1e2531;--border:#2a3340;
-  --text:#e6ebf2;--text-dim:#9aa7b8;--accent:#38bdf8;--accent-2:#6b7cff;
-  --ok:#22c55e;--retake:#f59e0b;--reject:#ef4444;--pending:#64748b;
-  --radius:10px;--shadow:0 6px 24px rgba(0,0,0,.35);
+  --bg:#0d0d0f;--bg2:#141416;--bg3:#1c1c1f;--bg4:#232327;
+  --border:#2a2a2f;--border2:#3a3a42;
+  --text:#e8e8ec;--text2:#9a9aaa;--text3:#5a5a6a;
+  --accent:#7c6fff;--accent2:#5a4fff;
+  --red:#ff5a5a;--green:#5affa0;--amber:#ffb85a;
+  --radius:10px;--radius2:6px;
+  --font-head:'Syne',sans-serif;--font-body:'Noto Sans JP',sans-serif;
+  --cols:4;
 }
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
-button{font-family:inherit}
-.topbar{display:flex;align-items:center;gap:16px;padding:10px 20px;background:var(--bg-2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-.brand{font-weight:700;font-size:18px;cursor:pointer;display:flex;align-items:center;gap:8px}
-.brand .logo{color:var(--accent);font-size:22px}
-.breadcrumb{color:var(--text-dim);display:flex;align-items:center;gap:8px}
-.breadcrumb a{color:var(--accent);cursor:pointer;text-decoration:none}
-.breadcrumb .sep{opacity:.5}
-.spacer{flex:1}
-.folder-status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim)}
-.folder-status .dot{width:8px;height:8px;border-radius:50%;background:var(--reject)}
-.folder-status.connected .dot{background:var(--ok)}
-.user-field{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:12px}
-.user-field input{background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;width:110px}
-main{padding:24px;max-width:1400px;margin:0 auto}
-.page-head{display:flex;align-items:center;gap:16px;margin-bottom:20px}
-.page-head h1{font-size:22px;margin:0}
-.page-head .sub{color:var(--text-dim)}
-button.btn{background:var(--accent-2);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer;transition:filter .15s}
-button.btn:hover{filter:brightness(1.1)}
-button.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
-button.btn.small{padding:5px 10px;font-size:12px}
-button.btn.danger{background:var(--reject)}
-.empty{color:var(--text-dim);text-align:center;padding:60px 20px;border:1px dashed var(--border);border-radius:var(--radius)}
-.grid-projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-.project-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;transition:transform .12s,border-color .12s}
-.project-card:hover{transform:translateY(-2px);border-color:var(--accent)}
-.project-card h3{margin:0 0 6px}
-.pc-desc{color:var(--text-dim);font-size:13px;min-height:18px;margin:0 0 12px}
-.pc-steps{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-.pc-meta{color:var(--text-dim);font-size:12px}
-.step-chip{font-size:11px;padding:2px 8px;border-radius:20px;color:#fff;white-space:nowrap}
-.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-.toolbar input.search{background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;width:240px}
-.grid-shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
-.shot-tile{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:transform .12s,border-color .12s}
-.shot-tile:hover{transform:translateY(-2px);border-color:var(--accent)}
-.st-thumb{aspect-ratio:16/9;background:#0a0d12 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:12px;position:relative}
-.st-thumb .play{position:absolute;font-size:34px;color:rgba(255,255,255,.85);text-shadow:0 2px 8px rgba(0,0,0,.6)}
-.st-body{padding:10px 12px 12px}
-.st-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.st-name{font-weight:600}
-.st-steps{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.st-step{font-size:10px;padding:2px 7px;border-radius:12px;border:1px solid var(--border);color:var(--text-dim);display:flex;align-items:center;gap:4px}
-.st-step .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.badge{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600;white-space:nowrap}
-.badge.pending{background:rgba(100,116,139,.2);color:#cbd5e1}
-.badge.approved{background:rgba(34,197,94,.18);color:#4ade80}
-.badge.retake{background:rgba(245,158,11,.18);color:#fbbf24}
-.badge.rejected{background:rgba(239,68,68,.18);color:#f87171}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;padding:24px}
-.modal-overlay.hidden{display:none}
-.modal{background:var(--bg-2);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);width:100%;max-width:920px;max-height:90vh;overflow:auto}
-.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-2)}
-.modal-head h2{margin:0;font-size:18px}
-.modal-body{padding:20px}
-.icon-btn{background:transparent;border:none;color:var(--text-dim);font-size:22px;cursor:pointer;line-height:1}
-.form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-.form-row label{font-size:12px;color:var(--text-dim)}
-.form-row input,.form-row textarea,.form-row select{background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px;font-size:14px}
-.form-row textarea{min-height:70px;resize:vertical}
-.form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
-.review-media{width:100%;background:#000;border-radius:10px;overflow:hidden;margin-bottom:14px}
-.review-media img,.review-media video{width:100%;display:block;max-height:55vh;object-fit:contain}
-.version-list{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.version-chip{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-3);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
-.version-chip.active{border-color:var(--accent);background:rgba(56,189,248,.12)}
-.version-chip .status-dot{width:8px;height:8px;border-radius:50%}
-.review-actions{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap}
-.review-actions .btn.ok{background:var(--ok)}
-.review-actions .btn.retake{background:var(--retake)}
-.review-actions .btn.reject{background:var(--reject)}
-.notes{border-top:1px solid var(--border);padding-top:14px;margin-top:8px}
-.note{background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px}
-.note .meta{color:var(--text-dim);font-size:11px;margin-bottom:4px}
-.note-input{display:flex;gap:8px;margin-top:10px}
-.note-input input{flex:1;background:var(--bg-3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 11px}
-.step-status-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
-.step-status-row{display:flex;align-items:center;gap:10px;background:var(--bg-3);border:1px solid var(--border);border-radius:8px;padding:8px 12px}
-.step-status-row .name{flex:1;display:flex;align-items:center;gap:8px}
-.step-status-row select{background:var(--bg)}
-.uploading{display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:13px;margin-top:8px}
-.bar{height:6px;background:var(--bg-3);border-radius:4px;overflow:hidden;flex:1}
-.bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+html,body{height:100%}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text);font-size:14px;display:flex;flex-direction:column;overflow:hidden}
+button{font-family:inherit;background:none;border:none;color:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
 .hidden{display:none!important}
-.section-title{font-size:13px;color:var(--text-dim);margin:18px 0 8px;text-transform:uppercase;letter-spacing:.04em}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg-3);border:1px solid var(--border);padding:10px 18px;border-radius:10px;box-shadow:var(--shadow);z-index:200}
-.gate{max-width:640px;margin:80px auto;text-align:center;background:var(--bg-2);border:1px solid var(--border);border-radius:16px;padding:48px 32px}
-.gate .logo{font-size:44px;color:var(--accent)}
-.gate h1{margin:12px 0 6px}
-.gate p{color:var(--text-dim);line-height:1.7}
-.gate .warn{color:var(--retake);font-size:13px;margin-top:16px}
+
+/* HEADER */
+.header{display:flex;align-items:center;gap:12px;padding:0 16px;height:56px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;z-index:100}
+.logo{order:-1;display:inline-flex;flex-direction:column;align-items:flex-start;flex-shrink:0;line-height:1}
+.logo .name{font-family:var(--font-head);font-size:22px;font-weight:700;letter-spacing:.5px}
+.logo .name b{color:var(--accent)}
+.logo .ver{font-family:var(--font-head);font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1px;margin-top:2px}
+.home-btn{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;font-size:18px;background:var(--bg4);border:1px solid transparent;border-radius:var(--radius2);transition:all .15s}
+.home-btn:hover{background:rgba(124,111,255,.15);border-color:var(--accent)}
+.search-wrap{flex:1;max-width:360px;position:relative}
+.search-wrap input{width:100%;padding:8px 10px 8px 32px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);font-size:13px}
+.search-wrap input:focus{outline:none;border-color:var(--accent)}
+.search-wrap .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px}
+.header-actions{display:flex;gap:8px;margin-left:auto;align-items:center}
+.folder-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);padding:5px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);cursor:pointer}
+.folder-status:hover{border-color:var(--border2)}
+.folder-status .dot{width:8px;height:8px;border-radius:50%;background:var(--red)}
+.folder-status.connected .dot{background:var(--green)}
+.user-field{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3)}
+.user-field input{width:100px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);font-size:12px}
+.size-btns{display:flex;gap:2px}
+.size-btn{width:30px;height:30px;border-radius:var(--radius2);border:1px solid var(--border);color:var(--text3);font-size:12px;display:flex;align-items:center;justify-content:center}
+.size-btn.active{color:var(--green);border-color:var(--green)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius2);font-size:13px;font-weight:500;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+.btn-danger{border:1px solid var(--red);color:var(--red)}
+.btn-danger:hover{background:rgba(255,90,90,.12)}
+.btn-icon{width:32px;height:32px;border-radius:var(--radius2);display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--text2)}
+.btn-icon:hover{background:var(--bg4);color:var(--text)}
+.btn-sm{padding:4px 9px;font-size:12px}
+
+/* LAYOUT */
+.app-body{display:flex;flex:1;overflow:hidden;position:relative}
+.sidebar{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding:14px 10px}
+.sidebar-section{margin-bottom:22px}
+.sidebar-label{font-size:10px;font-weight:500;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;padding:0 8px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--radius2);font-size:13px;color:var(--text2);cursor:pointer;transition:all .15s}
+.nav-item:hover{background:var(--bg4);color:var(--text)}
+.nav-item.active{background:var(--bg4);color:var(--text)}
+.nav-item .ni-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.nav-item .ni-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.nav-item .badge{margin-left:auto;background:var(--bg3);border:1px solid var(--border);border-radius:10px;font-size:10px;padding:1px 6px;color:var(--text3)}
+.nav-item .ni-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.main-head{display:flex;align-items:center;gap:12px;padding:16px 20px 0}
+.main-head h1{font-family:var(--font-head);font-size:20px;font-weight:700}
+.main-head .sub{color:var(--text3);font-size:12px}
+.main-head .spacer{flex:1}
+.grid-wrap{flex:1;overflow-y:auto;padding:16px 20px 24px}
+
+/* GRID / CARDS (OGREF vcard) */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(var(--cols,4),1fr)}
+.vcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;position:relative}
+.vcard:hover{border-color:var(--border2);transform:translateY(-5px);box-shadow:0 14px 32px rgba(0,0,0,.45)}
+.vcard-thumb-wrap{position:relative;padding-bottom:56.25%;background:#111;overflow:hidden}
+.vcard-thumb-wrap img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.vcard-thumb-no-img{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:rgba(255,255,255,.25);font-size:26px;gap:6px;background:linear-gradient(135deg,#161225 0%,#1e1830 100%)}
+.vcard-thumb-no-img .no-img-label{font-size:11px;color:rgba(255,255,255,.35);letter-spacing:1px;font-family:var(--font-head)}
+.vcard-thumb-no-img .big{font-family:var(--font-head);font-size:34px;font-weight:700;color:rgba(124,111,255,.55)}
+.vcard-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;color:rgba(255,255,255,.85);text-shadow:0 2px 10px rgba(0,0,0,.7);pointer-events:none}
+.vcard-badge{position:absolute;top:6px;left:6px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;letter-spacing:.3px;z-index:3;backdrop-filter:blur(4px)}
+.badge-pending{background:rgba(90,90,106,.75);color:#e8e8ec}
+.badge-approved{background:rgba(42,157,92,.8);color:#fff}
+.badge-retake{background:rgba(255,184,90,.85);color:#1a1200}
+.badge-rejected{background:rgba(255,90,90,.8);color:#fff}
+.vcard-actions{position:absolute;top:6px;right:6px;display:flex;gap:4px;opacity:0;transition:opacity .15s;z-index:4}
+.vcard:hover .vcard-actions{opacity:1}
+.vcard-act-btn{width:26px;height:26px;border-radius:5px;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff}
+.vcard-act-btn:hover{background:rgba(255,90,90,.5)}
+.vcard-overlay{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 9px;background:linear-gradient(transparent,rgba(0,0,0,.9));z-index:2;pointer-events:none}
+.vcard-overlay-title{font-size:12px;font-weight:500;color:#fff;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:5px}
+.vcard-overlay-meta{display:flex;flex-wrap:wrap;gap:3px}
+.vcard-step{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:8px;font-size:9px;background:rgba(255,255,255,.13);color:rgba(255,255,255,.85)}
+.vcard-step .d{width:6px;height:6px;border-radius:50%}
+.empty{grid-column:1/-1;color:var(--text3);text-align:center;padding:70px 20px;border:1px dashed var(--border);border-radius:var(--radius)}
+.empty .big{font-size:34px;margin-bottom:10px;opacity:.5}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;z-index:1000;padding:24px}
+.modal-overlay.hidden{display:none}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:modalIn .25s cubic-bezier(.16,1,.3,1)}
+.modal.lg{max-width:940px}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2);z-index:2}
+.modal-title{font-family:var(--font-head);font-size:16px;font-weight:700}
+.modal-title .sub{font-family:var(--font-body);font-size:12px;color:var(--text3);font-weight:400;margin-top:2px}
+.modal-close{font-size:20px;color:var(--text3);width:30px;height:30px;border-radius:6px}
+.modal-close:hover{background:var(--bg4);color:var(--text)}
+.modal-body{padding:20px}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border)}
+.form-row{margin-bottom:14px}
+.form-label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px}
+.form-input{width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);font-size:14px}
+.form-input:focus{outline:none;border-color:var(--accent)}
+textarea.form-input{height:72px;resize:vertical}
+.section-label{font-family:var(--font-head);font-size:11px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin:20px 0 10px}
+
+/* REVIEW */
+.review-media{width:100%;background:#000;border-radius:10px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border)}
+.review-media img,.review-media video{width:100%;display:block;max-height:56vh;object-fit:contain}
+.version-list{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.version-chip{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;color:var(--text2)}
+.version-chip.active{border-color:var(--accent);background:rgba(124,111,255,.12);color:var(--text)}
+.version-chip .status-dot{width:8px;height:8px;border-radius:50%}
+.review-status-line{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:var(--text2)}
+.rbadge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.review-actions{display:flex;gap:8px;margin:10px 0 4px;flex-wrap:wrap}
+.review-actions .btn.ok{background:var(--green);color:#04120a}
+.review-actions .btn.retake{background:var(--amber);color:#1a1200}
+.review-actions .btn.reject{background:var(--red);color:#fff}
+.notes{border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
+.note{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.note .meta{color:var(--text3);font-size:11px;margin-bottom:4px}
+.note-input{display:flex;gap:8px;margin-top:10px}
+.note-input input{flex:1}
+.step-grid{display:flex;flex-direction:column;gap:8px}
+.step-row{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px}
+.step-row .name{flex:1;display:flex;align-items:center;gap:8px;font-size:13px}
+.step-row select{padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)}
+.uploading{display:flex;align-items:center;gap:10px;color:var(--text3);font-size:12px;margin-top:10px}
+.bar{height:6px;background:var(--bg3);border-radius:4px;overflow:hidden;flex:1}
+.bar>i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+.file-drop{border:1px dashed var(--border2);border-radius:10px;padding:16px;text-align:center;color:var(--text3);font-size:13px;cursor:pointer}
+.file-drop:hover{border-color:var(--accent);color:var(--text2)}
+.file-drop input{display:none}
+.step-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;color:#fff}
+
+/* GATE (OGREF login/ws 風) */
+.gate{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.gate-box{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:44px 36px;max-width:520px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.gate-logo{font-family:var(--font-head);font-size:40px;font-weight:700}
+.gate-logo b{color:var(--accent)}
+.gate-sub{color:var(--text2);line-height:1.8;margin:14px 0 4px;font-size:13px}
+.gate-sub code{background:var(--bg4);padding:1px 6px;border-radius:4px;font-size:12px;color:var(--accent)}
+.gate-actions{display:flex;gap:10px;justify-content:center;margin-top:24px;flex-wrap:wrap}
+.gate-note{color:var(--text3);font-size:12px;margin-top:16px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);padding:11px 18px;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);z-index:2000;font-size:13px}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:6px;border:2px solid var(--bg)}
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="brand" id="brand"><span class="logo">◐</span> Layna</div>
-  <nav class="breadcrumb" id="breadcrumb"></nav>
-  <div class="spacer"></div>
-  <div class="folder-status" id="folderStatus" title="保存先フォルダ"><span class="dot"></span><span id="folderName">未接続</span></div>
-  <button class="btn ghost small" id="reconnectBtn" style="display:none">フォルダ変更</button>
-  <label class="user-field"><span>ユーザー</span><input id="currentUser" type="text" placeholder="名前" /></label>
+<header class="header">
+  <div class="logo"><span class="name">La<b>y</b>na</span><span class="ver">PROJECT</span></div>
+  <button class="home-btn" id="homeBtn" title="ホーム">◐</button>
+  <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="検索..." /></div>
+  <div class="header-actions">
+    <div class="size-btns" id="sizeBtns"></div>
+    <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
+    <label class="user-field"><span>👤</span><input id="currentUser" type="text" placeholder="名前" /></label>
+    <button class="btn btn-primary" id="addBtn">+ 追加</button>
+  </div>
 </header>
-
-<main id="view"></main>
+<div class="app-body">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="main-head" id="mainHead"></div>
+    <div class="grid-wrap"><div class="grid" id="grid"></div></div>
+  </main>
+</div>
 
 <div class="modal-overlay hidden" id="modal"><div class="modal" id="modalBody"></div></div>
-
-<template id="tpl-project-card">
-  <article class="project-card">
-    <h3 class="pc-name"></h3><p class="pc-desc"></p>
-    <div class="pc-steps"></div><div class="pc-meta"><span class="pc-count"></span></div>
-  </article>
-</template>
-<template id="tpl-shot-tile">
-  <article class="shot-tile">
-    <div class="st-thumb"></div>
-    <div class="st-body"><div class="st-head"><span class="st-name"></span><span class="st-badge"></span></div><div class="st-steps"></div></div>
-  </article>
-</template>
 
 <script>
 'use strict';
 /* ============================================================
-   Layna — サーバー不要・単一HTML版（OGREF / OGPipeline 踏襲）
+   Layna — 単一HTML（OGREF と同じデザイン / サーバー不要）
    保存先はローカルフォルダ（File System Access API）。
-   フォルダ内に layna_db.json / media/ / thumbnails/ を作成する。
-   File System Access API 非対応ブラウザでは IndexedDB に退避保存。
+   フォルダ内に layna_db.json / media/ / thumbnails/ を作成。
+   非対応ブラウザは IndexedDB に退避保存。
    ============================================================ */
 
-/* ---------- 定数 ---------- */
 const STEP_STATUS={
-  not_started:{label:'未着手',color:'#64748b'},
-  wip:{label:'作業中',color:'#38bdf8'},
-  review:{label:'確認待ち',color:'#a855f7'},
-  retake:{label:'リテイク',color:'#f59e0b'},
-  approved:{label:'OK',color:'#22c55e'},
+  not_started:{label:'未着手',color:'#5a5a6a'},
+  wip:{label:'作業中',color:'#7c6fff'},
+  review:{label:'確認待ち',color:'#ffb85a'},
+  retake:{label:'リテイク',color:'#ff9a5a'},
+  approved:{label:'OK',color:'#5affa0'},
 };
 const REVIEW_STATUS={
   pending:{label:'チェック待ち',cls:'pending'},
@@ -158,571 +213,393 @@ const REVIEW_STATUS={
 };
 const SEED_TEMPLATES=[
   {id:'tpl_cg_standard',name:'標準CGパイプライン',description:'OGPipeline の標準的なCG工程設定を踏襲',
-   steps:[{id:'step_layout',name:'レイアウト',color:'#6b7cff',order:1},{id:'step_anim',name:'アニメーション',color:'#38bdf8',order:2},{id:'step_fx',name:'エフェクト',color:'#a855f7',order:3},{id:'step_light',name:'ライティング',color:'#f59e0b',order:4},{id:'step_comp',name:'コンポジット',color:'#22c55e',order:5}]},
+   steps:[{id:'step_layout',name:'レイアウト',color:'#7c6fff',order:1},{id:'step_anim',name:'アニメーション',color:'#5a9bff',order:2},{id:'step_fx',name:'エフェクト',color:'#c06fff',order:3},{id:'step_light',name:'ライティング',color:'#ffb85a',order:4},{id:'step_comp',name:'コンポジット',color:'#5affa0',order:5}]},
   {id:'tpl_2d',name:'2D/作画パイプライン',description:'作画・仕上げ・撮影の2D向け工程',
-   steps:[{id:'step_lo',name:'レイアウト',color:'#6b7cff',order:1},{id:'step_genga',name:'原画',color:'#38bdf8',order:2},{id:'step_douga',name:'動画',color:'#a855f7',order:3},{id:'step_shiage',name:'仕上げ',color:'#f59e0b',order:4},{id:'step_satsuei',name:'撮影',color:'#22c55e',order:5}]},
+   steps:[{id:'step_lo',name:'レイアウト',color:'#7c6fff',order:1},{id:'step_genga',name:'原画',color:'#5a9bff',order:2},{id:'step_douga',name:'動画',color:'#c06fff',order:3},{id:'step_shiage',name:'仕上げ',color:'#ffb85a',order:4},{id:'step_satsuei',name:'撮影',color:'#5affa0',order:5}]},
   {id:'tpl_simple',name:'シンプル（制作→チェック）',description:'工程を最小限にした汎用テンプレート',
-   steps:[{id:'step_prod',name:'制作',color:'#38bdf8',order:1},{id:'step_check',name:'チェック',color:'#22c55e',order:2}]},
+   steps:[{id:'step_prod',name:'制作',color:'#5a9bff',order:1},{id:'step_check',name:'チェック',color:'#5affa0',order:2}]},
 ];
 
-/* ---------- ID生成 ---------- */
 let _c=0;
 function newId(p){_c++;return p+'_'+Date.now().toString(36)+_c.toString(36)}
 function nowIso(){try{return new Date().toISOString()}catch(_){return''}}
 
-/* ============================================================
-   IndexedDB（フォルダハンドル永続化 + フォールバック用blob保存）
-   ============================================================ */
-function idbOpen(){
-  return new Promise((res,rej)=>{
-    const r=indexedDB.open('layna',1);
-    r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('handles'))d.createObjectStore('handles');if(!d.objectStoreNames.contains('blobs'))d.createObjectStore('blobs');if(!d.objectStoreNames.contains('kv'))d.createObjectStore('kv')};
-    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
-  });
-}
-async function idbPut(store,key,val){const d=await idbOpen();return new Promise((res,rej)=>{const tx=d.transaction(store,'readwrite');tx.objectStore(store).put(val,key);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
-async function idbGet(store,key){const d=await idbOpen();return new Promise((res,rej)=>{const tx=d.transaction(store,'readonly');const rq=tx.objectStore(store).get(key);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error)})}
-async function idbDel(store,key){const d=await idbOpen();return new Promise((res,rej)=>{const tx=d.transaction(store,'readwrite');tx.objectStore(store).delete(key);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
+/* ---------- IndexedDB ---------- */
+function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open('layna',1);r.onupgradeneeded=()=>{const d=r.result;for(const s of['handles','blobs','kv'])if(!d.objectStoreNames.contains(s))d.createObjectStore(s)};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function idbPut(s,k,v){const d=await idbOpen();return new Promise((res,rej)=>{const t=d.transaction(s,'readwrite');t.objectStore(s).put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
+async function idbGet(s,k){const d=await idbOpen();return new Promise((res,rej)=>{const t=d.transaction(s,'readonly');const q=t.objectStore(s).get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function idbDel(s,k){const d=await idbOpen();return new Promise((res,rej)=>{const t=d.transaction(s,'readwrite');t.objectStore(s).delete(k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)})}
 
-/* ============================================================
-   ストレージ抽象化：folder（File System Access）/ idb（フォールバック）
-   ============================================================ */
+/* ---------- ストレージ抽象化 ---------- */
 const storage={
-  mode:null,          // 'folder' | 'idb'
-  rootHandle:null,
-  urlCache:new Map(),
-
+  mode:null,rootHandle:null,_pending:null,urlCache:new Map(),
   supportsFolder(){return typeof window.showDirectoryPicker==='function'},
-
-  async pickFolder(){
-    const handle=await window.showDirectoryPicker({mode:'readwrite',id:'layna-root'});
-    const ok=await this._ensurePerm(handle);
-    if(!ok)throw new Error('フォルダへの書き込み許可が必要です');
-    this.rootHandle=handle;this.mode='folder';
-    await idbPut('handles','root',handle);
-    try{localStorage.setItem('layna_mode','folder')}catch(_){}
-    return handle.name;
-  },
-
-  async tryReconnect(){
-    if(!this.supportsFolder())return false;
-    const handle=await idbGet('handles','root');
-    if(!handle)return false;
-    // 既に許可済みか確認（プロンプトは出さない）
-    const perm=await handle.queryPermission({mode:'readwrite'});
-    if(perm==='granted'){this.rootHandle=handle;this.mode='folder';return true}
-    // 要ユーザー操作。ハンドルは保持して再許可ボタンで対応
-    this._pending=handle;return false;
-  },
-  async resumePending(){
-    if(!this._pending)return false;
-    const ok=await this._ensurePerm(this._pending);
-    if(!ok)return false;
-    this.rootHandle=this._pending;this.mode='folder';this._pending=null;return true;
-  },
-  async _ensurePerm(handle){
-    const opt={mode:'readwrite'};
-    if(await handle.queryPermission(opt)==='granted')return true;
-    return (await handle.requestPermission(opt))==='granted';
-  },
-
+  async pickFolder(){const h=await window.showDirectoryPicker({mode:'readwrite',id:'layna-root'});if(!await this._perm(h))throw new Error('書き込み許可が必要です');this.rootHandle=h;this.mode='folder';await idbPut('handles','root',h);try{localStorage.setItem('layna_mode','folder')}catch(_){}return h.name},
+  async tryReconnect(){if(!this.supportsFolder())return false;const h=await idbGet('handles','root');if(!h)return false;if(await h.queryPermission({mode:'readwrite'})==='granted'){this.rootHandle=h;this.mode='folder';return true}this._pending=h;return false},
+  async resumePending(){if(!this._pending)return false;if(!await this._perm(this._pending))return false;this.rootHandle=this._pending;this.mode='folder';this._pending=null;return true},
+  async _perm(h){const o={mode:'readwrite'};if(await h.queryPermission(o)==='granted')return true;return (await h.requestPermission(o))==='granted'},
   useIdb(){this.mode='idb';try{localStorage.setItem('layna_mode','idb')}catch(_){}},
-
-  folderLabel(){
-    if(this.mode==='folder'&&this.rootHandle)return this.rootHandle.name;
-    if(this.mode==='idb')return 'ブラウザ内保存';
-    return '未接続';
-  },
-
-  async _subdir(name){
-    return this.rootHandle.getDirectoryHandle(name,{create:true});
-  },
-
-  /* db.json 読み書き */
-  async loadDb(){
-    if(this.mode==='folder'){
-      try{
-        const fh=await this.rootHandle.getFileHandle('layna_db.json');
-        const txt=await (await fh.getFile()).text();
-        return JSON.parse(txt);
-      }catch(e){return null}
-    }else{
-      return (await idbGet('kv','db'))||null;
-    }
-  },
-  async saveDb(db){
-    if(this.mode==='folder'){
-      const fh=await this.rootHandle.getFileHandle('layna_db.json',{create:true});
-      const w=await fh.createWritable();await w.write(JSON.stringify(db,null,2));await w.close();
-    }else{
-      await idbPut('kv','db',db);
-    }
-  },
-
-  /* メディア保存：相対パス（folder）または idb キーを返す */
-  async putMedia(sub,filename,blob){
-    if(this.mode==='folder'){
-      const dir=await this._subdir(sub);
-      const fh=await dir.getFileHandle(filename,{create:true});
-      const w=await fh.createWritable();await w.write(blob);await w.close();
-      return sub+'/'+filename;
-    }else{
-      const key='blob_'+newId('b')+'_'+filename;
-      await idbPut('blobs',key,blob);
-      return 'idb:'+key;
-    }
-  },
-  async delMedia(ref){
-    if(!ref)return;
-    try{
-      if(ref.startsWith('idb:')){await idbDel('blobs',ref.slice(4))}
-      else if(this.mode==='folder'){
-        const [sub,fn]=ref.split('/');
-        const dir=await this.rootHandle.getDirectoryHandle(sub,{create:false});
-        await dir.removeEntry(fn);
-      }
-    }catch(e){/* 既に無い場合は無視 */}
-    const u=this.urlCache.get(ref);if(u){URL.revokeObjectURL(u);this.urlCache.delete(ref)}
-  },
-  /* 表示用 objectURL を取得（キャッシュ） */
-  async getURL(ref){
-    if(!ref)return null;
-    if(this.urlCache.has(ref))return this.urlCache.get(ref);
-    let blob=null;
-    try{
-      if(ref.startsWith('idb:')){blob=await idbGet('blobs',ref.slice(4))}
-      else{
-        const [sub,fn]=ref.split('/');
-        const dir=await this.rootHandle.getDirectoryHandle(sub,{create:false});
-        const fh=await dir.getFileHandle(fn);blob=await fh.getFile();
-      }
-    }catch(e){return null}
-    if(!blob)return null;
-    const url=URL.createObjectURL(blob);this.urlCache.set(ref,url);return url;
-  },
+  folderLabel(){if(this.mode==='folder'&&this.rootHandle)return this.rootHandle.name;if(this.mode==='idb')return 'ブラウザ内保存';return '未接続'},
+  async _subdir(n){return this.rootHandle.getDirectoryHandle(n,{create:true})},
+  async loadDb(){if(this.mode==='folder'){try{const fh=await this.rootHandle.getFileHandle('layna_db.json');return JSON.parse(await (await fh.getFile()).text())}catch(e){return null}}return (await idbGet('kv','db'))||null},
+  async saveDb(db){if(this.mode==='folder'){const fh=await this.rootHandle.getFileHandle('layna_db.json',{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(db,null,2));await w.close()}else{await idbPut('kv','db',db)}},
+  async putMedia(sub,fn,blob){if(this.mode==='folder'){const dir=await this._subdir(sub);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return sub+'/'+fn}const key='blob_'+newId('b')+'_'+fn;await idbPut('blobs',key,blob);return 'idb:'+key},
+  async delMedia(ref){if(!ref)return;try{if(ref.startsWith('idb:'))await idbDel('blobs',ref.slice(4));else if(this.mode==='folder'){const[sub,fn]=ref.split('/');const dir=await this.rootHandle.getDirectoryHandle(sub);await dir.removeEntry(fn)}}catch(e){}const u=this.urlCache.get(ref);if(u){URL.revokeObjectURL(u);this.urlCache.delete(ref)}},
+  async getURL(ref){if(!ref)return null;if(this.urlCache.has(ref))return this.urlCache.get(ref);let blob=null;try{if(ref.startsWith('idb:'))blob=await idbGet('blobs',ref.slice(4));else{const[sub,fn]=ref.split('/');const dir=await this.rootHandle.getDirectoryHandle(sub);blob=await (await dir.getFileHandle(fn)).getFile()}}catch(e){return null}if(!blob)return null;const url=URL.createObjectURL(blob);this.urlCache.set(ref,url);return url},
 };
 
-/* ============================================================
-   アプリ状態 / DB
-   ============================================================ */
-let DB=null; // {pipelineTemplates, projects, shots}
+/* ---------- 状態 / DB ---------- */
+let DB=null;
 const state={view:'projects',projectId:null,project:null,search:'',activeShotId:null,activeVersionId:null};
-
 function defaultDb(){return{pipelineTemplates:JSON.parse(JSON.stringify(SEED_TEMPLATES)),projects:[],shots:[]}}
 async function persist(){await storage.saveDb(DB)}
 
-/* ---------- ユーティリティ ---------- */
+/* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
 const currentUser=()=>($('#currentUser').value||'').trim()||'anonymous';
-function toast(m){const t=el('div','toast',m);document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
-function shotOverallReview(s){const v=s.versions[s.versions.length-1];return v?v.review.status:'pending'}
+function toast(m){const t=el('div','toast',m);document.body.appendChild(t);setTimeout(()=>t.remove(),2400)}
 function shotsOf(pid){return DB.shots.filter(s=>s.projectId===pid)}
+function shotReview(s){const v=s.versions[s.versions.length-1];return v?v.review.status:'pending'}
 function reviewToStep(st){return{approved:'approved',retake:'retake',rejected:'retake',pending:'review'}[st]||'review'}
 function fmt(iso){if(!iso)return'';const d=new Date(iso);if(isNaN(d))return iso;const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())}
 
 /* ============================================================
-   接続ゲート（フォルダ未接続時の画面）
+   ゲート（未接続画面）
    ============================================================ */
+function showChrome(on){document.querySelector('.header').style.display=on?'':'none';document.querySelector('.app-body').style.display=on?'':'none'}
 function renderGate(){
-  const v=$('#view');v.innerHTML='';
-  const g=el('div','gate');
-  g.innerHTML='<div class="logo">◐</div><h1>Layna へようこそ</h1>';
+  showChrome(false);
+  let g=$('#gateScreen');if(g)g.remove();
+  g=el('div','gate');g.id='gateScreen';
+  const box=el('div','gate-box');
+  box.innerHTML='<div class="gate-logo">La<b>y</b>na</div>';
   const support=storage.supportsFolder();
-  const p=el('p');
+  const sub=el('div','gate-sub');
+  if(storage._pending){sub.innerHTML='前回のフォルダ「<b>'+storage._pending.name+'</b>」に再接続します。<br>ボタンを押してアクセスを許可してください。';}
+  else if(support){sub.innerHTML='このツール専用の<b>保存先フォルダ</b>を選んでください。<br>フォルダ内に <code>layna_db.json</code> と <code>media/</code> を作成し、<br>アップロードした動画・画像をそこに格納します。';}
+  else{sub.innerHTML='お使いのブラウザはフォルダ保存に未対応です。<br><b>Chrome / Edge</b> 推奨。<br>このままブラウザ内保存で続けることもできます。';}
+  box.appendChild(sub);
+  const acts=el('div','gate-actions');
   if(storage._pending){
-    p.innerHTML='前回のフォルダ「<b>'+storage._pending.name+'</b>」への接続を再開します。<br>ボタンを押してアクセスを許可してください。';
+    const b=el('button','btn btn-primary','フォルダに再接続');b.onclick=async()=>{try{if(await storage.resumePending())await boot();else toast('許可されませんでした')}catch(e){toast('接続失敗: '+e.message)}};acts.appendChild(b);
+    const b2=el('button','btn btn-ghost','別のフォルダを選ぶ');b2.onclick=connectFlow;acts.appendChild(b2);
   }else if(support){
-    p.innerHTML='このツール専用の<b>保存先フォルダ</b>を選択してください。<br>選んだフォルダ内に <code>layna_db.json</code> と <code>media/</code> を作成し、<br>アップロードした動画・画像はそこに格納されます。';
+    const b=el('button','btn btn-primary','保存先フォルダを選択');b.onclick=connectFlow;acts.appendChild(b);
+    const b2=el('button','btn btn-ghost','ブラウザ内保存で続ける');b2.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b2);
   }else{
-    p.innerHTML='お使いのブラウザはフォルダ保存（File System Access API）に未対応です。<br><b>Chrome または Edge</b> を推奨します。<br>このままブラウザ内保存（IndexedDB）で続けることもできます。';
+    const b=el('button','btn btn-primary','ブラウザ内保存で開始');b.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b);
   }
-  g.appendChild(p);
-  const acts=el('div');acts.style.marginTop='22px';acts.style.display='flex';acts.style.gap='10px';acts.style.justifyContent='center';
-  if(storage._pending){
-    const b=el('button','btn','フォルダに再接続');
-    b.onclick=async()=>{try{if(await storage.resumePending()){await boot();}else{toast('許可されませんでした')}}catch(e){toast('接続失敗: '+e.message)}};
-    acts.appendChild(b);
-    const b2=el('button','btn ghost','別のフォルダを選ぶ');
-    b2.onclick=connectFlow;acts.appendChild(b2);
-  }else if(support){
-    const b=el('button','btn','保存先フォルダを選択');
-    b.onclick=connectFlow;acts.appendChild(b);
-    // file:// でフォルダ選択がブロックされる環境向けのフォールバック
-    const b2=el('button','btn ghost','ブラウザ内保存で続ける');
-    b2.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b2);
-  }else{
-    const b=el('button','btn','ブラウザ内保存で開始');
-    b.onclick=async()=>{storage.useIdb();await boot()};acts.appendChild(b);
-  }
-  g.appendChild(acts);
-  if(support&&!storage._pending){
-    const w=el('div','warn','※ Chrome / Edge で動作します。フォルダは初回のみ許可が必要です。');
-    g.appendChild(w);
-  }
-  v.appendChild(g);
+  box.appendChild(acts);
+  if(support&&!storage._pending)box.appendChild(el('div','gate-note','※ Chrome / Edge で動作。フォルダは初回のみ許可が必要です。'));
+  g.appendChild(box);document.body.appendChild(g);
 }
-async function connectFlow(){
-  try{await storage.pickFolder();await boot();}
-  catch(e){
-    if(e.name==='AbortError')return; // ユーザーがキャンセル
-    // file:// でブロックされた等。ブラウザ内保存を案内
-    toast('フォルダ選択が使えない環境です。「ブラウザ内保存で続ける」をご利用ください: '+e.message);
-  }
-}
+async function connectFlow(){try{await storage.pickFolder();await boot()}catch(e){if(e.name==='AbortError')return;toast('フォルダ選択が使えない環境です。「ブラウザ内保存で続ける」をご利用ください')}}
 
 /* ============================================================
    起動
    ============================================================ */
 async function boot(){
+  const g=$('#gateScreen');if(g)g.remove();
+  showChrome(true);
   DB=await storage.loadDb();
-  if(!DB){DB=defaultDb();await persist();}
+  if(!DB){DB=defaultDb();await persist()}
   for(const k of['pipelineTemplates','projects','shots'])if(!Array.isArray(DB[k]))DB[k]=[];
   if(!DB.pipelineTemplates.length)DB.pipelineTemplates=JSON.parse(JSON.stringify(SEED_TEMPLATES));
   updateFolderStatus();
-  $('#reconnectBtn').style.display='';
+  initSizeBtns();
   await go('projects');
 }
-function updateFolderStatus(){
-  const fs=$('#folderStatus');fs.classList.toggle('connected',!!storage.mode);
-  $('#folderName').textContent=storage.folderLabel();
+function updateFolderStatus(){const fs=$('#folderStatus');fs.classList.toggle('connected',!!storage.mode);$('#folderName').textContent=storage.folderLabel()}
+function initSizeBtns(){
+  const wrap=$('#sizeBtns');wrap.innerHTML='';
+  let cols=4;try{cols=parseInt(localStorage.getItem('layna_cols')||'4')}catch(_){}
+  document.documentElement.style.setProperty('--cols',cols);
+  [['S',6],['M',4],['L',3]].forEach(([lab,n])=>{
+    const b=el('button','size-btn'+(n===cols?' active':''),lab);
+    b.onclick=()=>{document.documentElement.style.setProperty('--cols',n);try{localStorage.setItem('layna_cols',n)}catch(_){}for(const x of wrap.children)x.classList.remove('active');b.classList.add('active')};
+    wrap.appendChild(b);
+  });
 }
 
 /* ============================================================
    ルーティング / レンダリング
    ============================================================ */
 async function go(view,projectId){
-  state.view=view;state.projectId=projectId||null;
-  if(view==='project'){state.project=DB.projects.find(p=>p.id===projectId)}
-  render();
-  if(view==='projects')resolveProjectThumbs();
-  if(view==='project')resolveShotThumbs();
+  state.view=view;state.projectId=projectId||null;state.search='';$('#searchInput').value='';
+  if(view==='project')state.project=DB.projects.find(p=>p.id===projectId);
+  render();resolveThumbs();
 }
-function render(){
-  renderBreadcrumb();
-  const v=$('#view');v.innerHTML='';
-  if(state.view==='projects')v.appendChild(renderProjects());
-  else if(state.view==='project')v.appendChild(renderProject());
+function render(){renderSidebar();renderMainHead();renderGrid()}
+
+function renderSidebar(){
+  const sb=$('#sidebar');sb.innerHTML='';
+  if(state.view==='projects'){
+    const sec=el('div','sidebar-section');
+    sec.appendChild(el('div','sidebar-label','ナビゲーション'));
+    const n=el('div','nav-item active');n.appendChild(elIcon('▦'));n.appendChild(el('span','ni-name','すべてのプロジェクト'));
+    const bd=el('span','badge',String(DB.projects.length));n.appendChild(bd);sec.appendChild(n);sb.appendChild(sec);
+    const sec2=el('div','sidebar-section');
+    sec2.appendChild(el('div','sidebar-label','工程テンプレート'));
+    for(const t of DB.pipelineTemplates){const it=el('div','nav-item');it.appendChild(elIcon('❏'));it.appendChild(el('span','ni-name',t.name));it.title=t.steps.map(s=>s.name).join(' → ');sec2.appendChild(it)}
+    sb.appendChild(sec2);
+  }else if(state.view==='project'){
+    const p=state.project;
+    const back=el('div','nav-item');back.appendChild(elIcon('←'));back.appendChild(el('span','ni-name','プロジェクト一覧'));back.onclick=()=>go('projects');sb.appendChild(back);
+    const sec=el('div','sidebar-section');
+    const lab=el('div','sidebar-label');lab.appendChild(el('span',null,'工程'));const edit=el('span',null,'設定');edit.style.cssText='cursor:pointer;color:var(--accent)';edit.onclick=openPipelineEditor;lab.appendChild(edit);sec.appendChild(lab);
+    for(const s of p.steps||[]){const it=el('div','nav-item');const d=el('span','ni-dot');d.style.background=s.color;it.appendChild(d);it.appendChild(el('span','ni-name',s.name));sec.appendChild(it)}
+    if(!(p.steps||[]).length){const e=el('div','nav-item');e.style.color='var(--text3)';e.appendChild(el('span','ni-name','工程なし'));sec.appendChild(e)}
+    sb.appendChild(sec);
+    const sec2=el('div','sidebar-section');
+    sec2.appendChild(el('div','sidebar-label','レビュー状況'));
+    const shots=shotsOf(p.id);const counts={pending:0,approved:0,retake:0,rejected:0};for(const s of shots)counts[shotReview(s)]++;
+    for(const[k,info]of Object.entries(REVIEW_STATUS)){const it=el('div','nav-item');const d=el('span','ni-dot');d.style.background=k==='pending'?'#5a5a6a':(k==='approved'?'#5affa0':(k==='retake'?'#ffb85a':'#ff5a5a'));it.appendChild(d);it.appendChild(el('span','ni-name',info.label));const bd=el('span','badge',String(counts[k]));it.appendChild(bd);sec2.appendChild(it)}
+    sb.appendChild(sec2);
+  }
 }
-function renderBreadcrumb(){
-  const bc=$('#breadcrumb');bc.innerHTML='';
-  const home=el('a',null,'プロジェクト');home.onclick=()=>go('projects');bc.appendChild(home);
-  if(state.view==='project'&&state.project){bc.appendChild(el('span','sep','/'));bc.appendChild(el('span',null,state.project.name))}
+function elIcon(ch){const s=el('span','ni-icon',ch);return s}
+
+function renderMainHead(){
+  const h=$('#mainHead');h.innerHTML='';
+  if(state.view==='projects'){
+    h.appendChild(el('h1',null,'プロジェクト'));
+  }else if(state.view==='project'){
+    const box=el('div');box.appendChild(el('h1',null,state.project.name));if(state.project.description)box.appendChild(el('div','sub',state.project.description));h.appendChild(box);
+  }
+  h.appendChild(el('div','spacer'));
+  $('#addBtn').textContent=state.view==='project'?'+ ショット':'+ プロジェクト';
 }
 
-/* ---- プロジェクト一覧 ---- */
-function renderProjects(){
-  const wrap=el('div');
-  const head=el('div','page-head');head.appendChild(el('h1',null,'プロジェクト'));head.appendChild(el('div','spacer'));
-  const add=el('button','btn','+ 新規プロジェクト');add.onclick=openProjectModal;head.appendChild(add);wrap.appendChild(head);
-  if(!DB.projects.length){wrap.appendChild(el('div','empty','プロジェクトがまだありません。「新規プロジェクト」から作成してください。'));return wrap}
-  const grid=el('div','grid-projects');const tpl=$('#tpl-project-card');
-  for(const p of DB.projects){
-    const node=tpl.content.cloneNode(true);
-    $('.pc-name',node).textContent=p.name;$('.pc-desc',node).textContent=p.description||'';
-    const steps=$('.pc-steps',node);
-    for(const s of p.steps||[]){const c=el('span','step-chip',s.name);c.style.background=s.color;steps.appendChild(c)}
-    $('.pc-count',node).textContent=shotsOf(p.id).length+' ショット';
-    $('.project-card',node).onclick=()=>go('project',p.id);
-    grid.appendChild(node);
+function renderGrid(){
+  const grid=$('#grid');grid.innerHTML='';
+  const q=state.search.trim().toLowerCase();
+  if(state.view==='projects'){
+    const list=DB.projects.filter(p=>!q||p.name.toLowerCase().includes(q));
+    if(!list.length){grid.appendChild(gridEmpty(DB.projects.length?'該当するプロジェクトがありません':'プロジェクトがまだありません。右上の「+ プロジェクト」から作成してください。'));return}
+    for(const p of list)grid.appendChild(projectCard(p));
+  }else if(state.view==='project'){
+    const list=shotsOf(state.project.id).filter(s=>!q||s.name.toLowerCase().includes(q));
+    if(!list.length){grid.appendChild(gridEmpty(shotsOf(state.project.id).length?'該当するショットがありません':'ショットがまだありません。右上の「+ ショット」から作成してください。'));return}
+    for(const s of list)grid.appendChild(shotCard(s));
   }
-  wrap.appendChild(grid);return wrap;
 }
-function resolveProjectThumbs(){/* プロジェクトカードはサムネ無し（拡張余地） */}
+function gridEmpty(msg){const e=el('div','empty');e.appendChild(el('div','big','◐'));e.appendChild(el('div',null,msg));return e}
 
-/* ---- プロジェクト詳細（ショットタイル） ---- */
-function renderProject(){
-  const wrap=el('div');const p=state.project;
-  const head=el('div','page-head');const title=el('div');
-  title.appendChild(el('h1',null,p.name));if(p.description)title.appendChild(el('div','sub',p.description));
-  head.appendChild(title);head.appendChild(el('div','spacer'));
-  const editBtn=el('button','btn ghost','工程設定');editBtn.onclick=openPipelineEditor;
-  const add=el('button','btn','+ ショット追加');add.onclick=openShotModal;
-  head.appendChild(editBtn);head.appendChild(add);wrap.appendChild(head);
-  const stepsBar=el('div','toolbar');
-  for(const s of p.steps||[]){const c=el('span','step-chip',s.name);c.style.background=s.color;stepsBar.appendChild(c)}
-  wrap.appendChild(stepsBar);
-  const toolbar=el('div','toolbar');const search=el('input','search');search.placeholder='ショットを検索...';search.value=state.search;
-  const holder=el('div');
-  search.oninput=()=>{state.search=search.value;renderShotGrid(holder);resolveShotThumbs()};
-  toolbar.appendChild(search);wrap.appendChild(toolbar);
-  wrap.appendChild(holder);renderShotGrid(holder);
-  return wrap;
+function projectCard(p){
+  const card=el('div','vcard');
+  const tw=el('div','vcard-thumb-wrap');
+  const ni=el('div','vcard-thumb-no-img');
+  ni.appendChild(el('div','big',(p.name||'?').slice(0,2)));
+  ni.appendChild(el('div','no-img-label',shotsOf(p.id).length+' SHOTS'));
+  tw.appendChild(ni);
+  const ov=el('div','vcard-overlay');ov.appendChild(el('div','vcard-overlay-title',p.name));
+  const meta=el('div','vcard-overlay-meta');
+  for(const s of (p.steps||[]).slice(0,5)){const c=el('span','vcard-step');const d=el('span','d');d.style.background=s.color;c.appendChild(d);c.appendChild(document.createTextNode(s.name));meta.appendChild(c)}
+  ov.appendChild(meta);tw.appendChild(ov);
+  card.appendChild(tw);
+  card.onclick=()=>go('project',p.id);
+  return card;
 }
-function renderShotGrid(holder){
-  holder.innerHTML='';const p=state.project;const q=state.search.trim().toLowerCase();
-  const shots=shotsOf(p.id).filter(s=>!q||s.name.toLowerCase().includes(q));
-  if(!shots.length){holder.appendChild(el('div','empty',shotsOf(p.id).length?'該当するショットがありません。':'ショットがまだありません。「ショット追加」から作成してください。'));return}
-  const grid=el('div','grid-shots');const tpl=$('#tpl-shot-tile');
-  for(const shot of shots){
-    const node=tpl.content.cloneNode(true);
-    const thumb=$('.st-thumb',node);thumb.dataset.thumbRef=shot.thumbnail||'';
-    const latest=shot.versions[shot.versions.length-1];
-    if(shot.thumbnail){thumb.textContent='';if(latest&&latest.type==='video')thumb.appendChild(el('span','play','▶'))}
-    else thumb.textContent='メディア未登録';
-    $('.st-name',node).textContent=shot.name;
-    const badge=$('.st-badge',node);const rs=REVIEW_STATUS[shotOverallReview(shot)];badge.className='st-badge badge '+rs.cls;badge.textContent=rs.label;
-    const sw=$('.st-steps',node);
-    for(const step of p.steps||[]){
-      const st=shot.stepStatuses[step.id]||'not_started';const info=STEP_STATUS[st];
-      const chip=el('span','st-step');const dot=el('span','dot');dot.style.background=info.color;
-      chip.appendChild(dot);chip.appendChild(document.createTextNode(step.name));chip.title=step.name+': '+info.label;sw.appendChild(chip);
-    }
-    $('.shot-tile',node).onclick=()=>openShotDetail(shot.id);
-    grid.appendChild(node);
-  }
-  holder.appendChild(grid);
+
+function shotCard(shot){
+  const card=el('div','vcard');
+  const tw=el('div','vcard-thumb-wrap');
+  const latest=shot.versions[shot.versions.length-1];
+  if(shot.thumbnail){const img=el('img');img.dataset.ref=shot.thumbnail;img.alt=shot.name;tw.appendChild(img);if(latest&&latest.type==='video')tw.appendChild(el('div','vcard-play','▶'))}
+  else{const ni=el('div','vcard-thumb-no-img');ni.appendChild(el('div',null,'▦'));ni.appendChild(el('div','no-img-label','NO MEDIA'));tw.appendChild(ni)}
+  const rs=REVIEW_STATUS[shotReview(shot)];
+  const badge=el('div','vcard-badge badge-'+rs.cls,rs.label);tw.appendChild(badge);
+  const acts=el('div','vcard-actions');
+  const del=el('button','vcard-act-btn','🗑');del.title='削除';del.onclick=e=>{e.stopPropagation();deleteShot(shot)};acts.appendChild(del);tw.appendChild(acts);
+  const ov=el('div','vcard-overlay');ov.appendChild(el('div','vcard-overlay-title',shot.name));
+  const meta=el('div','vcard-overlay-meta');
+  for(const step of state.project.steps||[]){const st=shot.stepStatuses[step.id]||'not_started';const info=STEP_STATUS[st];const c=el('span','vcard-step');const d=el('span','d');d.style.background=info.color;c.appendChild(d);c.appendChild(document.createTextNode(step.name));c.title=step.name+': '+info.label;meta.appendChild(c)}
+  ov.appendChild(meta);tw.appendChild(ov);
+  card.appendChild(tw);
+  card.onclick=()=>openShotDetail(shot.id);
+  return card;
 }
-async function resolveShotThumbs(){
-  for(const thumb of document.querySelectorAll('.st-thumb[data-thumb-ref]')){
-    const ref=thumb.dataset.thumbRef;if(!ref)continue;
-    const url=await storage.getURL(ref);
-    if(url)thumb.style.backgroundImage='url("'+url+'")';
-  }
-}
+async function resolveThumbs(){for(const img of document.querySelectorAll('#grid img[data-ref]')){const url=await storage.getURL(img.dataset.ref);if(url)img.src=url}}
 
 /* ============================================================
    モーダル
    ============================================================ */
-function openModal(builder){const b=$('#modalBody');b.innerHTML='';builder(b);$('#modal').classList.remove('hidden')}
+function openModal(builder,big){const b=$('#modalBody');b.className='modal'+(big?' lg':'');b.innerHTML='';builder(b);$('#modal').classList.remove('hidden')}
 function closeModal(){$('#modal').classList.add('hidden')}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
-function modalHeader(body,title){
-  const h=el('div','modal-head');h.appendChild(el('h2',null,title));const x=el('button','icon-btn','×');x.onclick=closeModal;h.appendChild(x);body.appendChild(h);
+function modalHead(body,title,sub){
+  const h=el('div','modal-header');const t=el('div','modal-title');t.appendChild(document.createTextNode(title));if(sub){const s=el('div','sub',sub);t.appendChild(s)}h.appendChild(t);
+  const x=el('button','modal-close','×');x.onclick=closeModal;h.appendChild(x);body.appendChild(h);
   const inner=el('div','modal-body');body.appendChild(inner);return inner;
 }
-function formRow(label,type){const row=el('div','form-row');row.appendChild(el('label',null,label));const field=type==='textarea'?el('textarea'):type==='select'?el('select'):el('input');row.appendChild(field);return{row,field}}
+function modalFooter(body,buttons){const f=el('div','modal-footer');for(const b of buttons)f.appendChild(b);body.appendChild(f)}
+function formRow(label,type){const row=el('div','form-row');row.appendChild(el('label','form-label',label));const field=type==='textarea'?el('textarea','form-input'):type==='select'?el('select','form-input'):el('input','form-input');row.appendChild(field);return{row,field}}
 
 /* ---- 新規プロジェクト ---- */
 function openProjectModal(){
   openModal(body=>{
-    const inner=modalHeader(body,'新規プロジェクト');
+    const inner=modalHead(body,'新規プロジェクト');
     const nameRow=formRow('プロジェクト名','input');
     const descRow=formRow('説明','textarea');
     const tplRow=formRow('工程テンプレート（OGPipeline の工程設定を流用）','select');
-    const sel=tplRow.field;sel.appendChild(new Option('（工程なしで作成）',''));
-    for(const t of DB.pipelineTemplates)sel.appendChild(new Option(t.name+'（'+t.steps.map(s=>s.name).join(' → ')+'）',t.id));
-    if(DB.pipelineTemplates[0])sel.value=DB.pipelineTemplates[0].id;
+    tplRow.field.appendChild(new Option('（工程なしで作成）',''));
+    for(const t of DB.pipelineTemplates)tplRow.field.appendChild(new Option(t.name+'（'+t.steps.map(s=>s.name).join(' → ')+'）',t.id));
+    if(DB.pipelineTemplates[0])tplRow.field.value=DB.pipelineTemplates[0].id;
     inner.appendChild(nameRow.row);inner.appendChild(descRow.row);inner.appendChild(tplRow.row);
-    const acts=el('div','form-actions');
-    const cancel=el('button','btn ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn','作成');
+    const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
+    const save=el('button','btn btn-primary','作成');
     save.onclick=async()=>{
       if(!nameRow.field.value.trim())return toast('プロジェクト名を入力してください');
-      const tpl=DB.pipelineTemplates.find(t=>t.id===sel.value);
+      const tpl=DB.pipelineTemplates.find(t=>t.id===tplRow.field.value);
       const steps=tpl?tpl.steps.map(s=>({...s})):[];
       const project={id:newId('prj'),name:nameRow.field.value.trim(),description:descRow.field.value.trim(),steps:steps.sort((a,b)=>a.order-b.order),createdAt:nowIso()};
       DB.projects.push(project);await persist();closeModal();await go('project',project.id);
     };
-    acts.appendChild(cancel);acts.appendChild(save);inner.appendChild(acts);
+    modalFooter(body,[cancel,save]);
   });
 }
 
-/* ---- 工程設定エディタ ---- */
+/* ---- 工程設定 ---- */
 function openPipelineEditor(){
   openModal(body=>{
-    const inner=modalHeader(body,'工程設定');
-    inner.appendChild(el('p','sub','このプロジェクトの工程を編集します。テンプレートから流用した工程もここで調整できます。'));
-    const listWrap=el('div','step-status-grid');
-    let steps=(state.project.steps||[]).map(s=>({...s}));
-    function redraw(){
-      listWrap.innerHTML='';
-      steps.forEach((s,i)=>{
-        const row=el('div','step-status-row');
-        const color=el('input');color.type='color';color.value=s.color;color.style.width='38px';color.oninput=()=>s.color=color.value;
-        const name=el('input');name.value=s.name;name.style.flex='1';name.oninput=()=>s.name=name.value;
-        const del=el('button','btn small danger','削除');del.onclick=()=>{steps.splice(i,1);redraw()};
-        row.appendChild(color);row.appendChild(name);row.appendChild(del);listWrap.appendChild(row);
-      });
-    }
+    const inner=modalHead(body,'工程設定',state.project.name);
+    inner.appendChild(el('div','form-label','テンプレートから流用した工程もここで調整できます。'));
+    const listWrap=el('div','step-grid');let steps=(state.project.steps||[]).map(s=>({...s}));
+    function redraw(){listWrap.innerHTML='';steps.forEach((s,i)=>{const row=el('div','step-row');const color=el('input');color.type='color';color.value=s.color;color.style.cssText='width:36px;height:30px;background:none;border:none';color.oninput=()=>s.color=color.value;const name=el('input','form-input');name.value=s.name;name.oninput=()=>s.name=name.value;const del=el('button','btn btn-danger btn-sm','削除');del.onclick=()=>{steps.splice(i,1);redraw()};row.appendChild(color);row.appendChild(name);row.appendChild(del);listWrap.appendChild(row)})}
     redraw();inner.appendChild(listWrap);
-    const addStep=el('button','btn ghost small','+ 工程を追加');addStep.onclick=()=>{steps.push({id:newId('step'),name:'新しい工程',color:'#38bdf8',order:steps.length+1});redraw()};
-    inner.appendChild(addStep);
-    const acts=el('div','form-actions');
-    const cancel=el('button','btn ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn','保存');
-    save.onclick=async()=>{
-      const payload=steps.filter(s=>s.name.trim()).map((s,i)=>({id:s.id||newId('step'),name:s.name.trim(),color:s.color,order:i+1}));
-      state.project.steps=payload.sort((a,b)=>a.order-b.order);
-      // 既存ショットのステータスに新工程を補完
-      for(const shot of shotsOf(state.project.id))for(const st of payload)if(!(st.id in shot.stepStatuses))shot.stepStatuses[st.id]='not_started';
-      await persist();closeModal();render();resolveShotThumbs();toast('工程を保存しました');
-    };
-    acts.appendChild(cancel);acts.appendChild(save);inner.appendChild(acts);
+    const add=el('button','btn btn-ghost btn-sm','+ 工程を追加');add.style.marginTop='10px';add.onclick=()=>{steps.push({id:newId('step'),name:'新しい工程',color:'#7c6fff',order:steps.length+1});redraw()};inner.appendChild(add);
+    const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
+    const save=el('button','btn btn-primary','保存');
+    save.onclick=async()=>{const payload=steps.filter(s=>s.name.trim()).map((s,i)=>({id:s.id||newId('step'),name:s.name.trim(),color:s.color,order:i+1})).sort((a,b)=>a.order-b.order);state.project.steps=payload;for(const shot of shotsOf(state.project.id))for(const st of payload)if(!(st.id in shot.stepStatuses))shot.stepStatuses[st.id]='not_started';await persist();closeModal();render();resolveThumbs();toast('工程を保存しました')};
+    modalFooter(body,[cancel,save]);
   });
 }
 
 /* ---- 新規ショット ---- */
 function openShotModal(){
   openModal(body=>{
-    const inner=modalHeader(body,'ショット追加');
+    const inner=modalHead(body,'ショット追加',state.project.name);
     const nameRow=formRow('ショット名（例: cut_010）','input');
     const descRow=formRow('説明','textarea');
     inner.appendChild(nameRow.row);inner.appendChild(descRow.row);
-    const acts=el('div','form-actions');
-    const cancel=el('button','btn ghost','キャンセル');cancel.onclick=closeModal;
-    const save=el('button','btn','追加');
-    save.onclick=async()=>{
-      if(!nameRow.field.value.trim())return toast('ショット名を入力してください');
-      const stepStatuses={};for(const st of state.project.steps||[])stepStatuses[st.id]='not_started';
-      DB.shots.push({id:newId('shot'),projectId:state.project.id,name:nameRow.field.value.trim(),description:descRow.field.value.trim(),thumbnail:null,stepStatuses,versions:[],createdAt:nowIso()});
-      await persist();closeModal();render();resolveShotThumbs();
-    };
-    acts.appendChild(cancel);acts.appendChild(save);inner.appendChild(acts);
+    const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
+    const save=el('button','btn btn-primary','追加');
+    save.onclick=async()=>{if(!nameRow.field.value.trim())return toast('ショット名を入力してください');const stepStatuses={};for(const st of state.project.steps||[])stepStatuses[st.id]='not_started';DB.shots.push({id:newId('shot'),projectId:state.project.id,name:nameRow.field.value.trim(),description:descRow.field.value.trim(),thumbnail:null,stepStatuses,versions:[],createdAt:nowIso()});await persist();closeModal();render();resolveThumbs()};
+    modalFooter(body,[cancel,save]);
   });
+}
+
+async function deleteShot(shot){
+  if(!confirm('ショット「'+shot.name+'」を削除しますか？'))return;
+  for(const v of shot.versions){await storage.delMedia(v.file);await storage.delMedia(v.thumb)}
+  DB.shots=DB.shots.filter(s=>s.id!==shot.id);await persist();render();resolveThumbs();
 }
 
 /* ============================================================
    ショット詳細 / レビュー
    ============================================================ */
-function openShotDetail(shotId){
-  state.activeShotId=shotId;
-  const shot=DB.shots.find(s=>s.id===shotId);
-  state.activeVersionId=shot.versions.length?shot.versions[shot.versions.length-1].id:null;
-  openModal(renderShotDetail);
-}
+function openShotDetail(shotId){const shot=DB.shots.find(s=>s.id===shotId);state.activeShotId=shotId;state.activeVersionId=shot.versions.length?shot.versions[shot.versions.length-1].id:null;openModal(renderShotDetail,true)}
 function refreshShotDetail(){const b=$('#modalBody');b.innerHTML='';renderShotDetail(b)}
 async function renderShotDetail(body){
   const shot=DB.shots.find(s=>s.id===state.activeShotId);
-  const inner=modalHeader(body,shot.name);
-  if(shot.description)inner.appendChild(el('p','sub',shot.description));
+  const inner=modalHead(body,shot.name,shot.description||'');
   const version=shot.versions.find(v=>v.id===state.activeVersionId)||shot.versions[shot.versions.length-1];
 
-  const mediaBox=el('div','review-media');
   if(version){
-    const url=await storage.getURL(version.file);
-    if(version.type==='video'){const v=el('video');v.src=url||'';v.controls=true;mediaBox.appendChild(v)}
-    else{const img=el('img');img.src=url||'';mediaBox.appendChild(img)}
-    inner.appendChild(mediaBox);
-  }else{
-    inner.appendChild(el('div','empty','メディアがまだアップロードされていません'));
-  }
+    const mb=el('div','review-media');const url=await storage.getURL(version.file);
+    if(version.type==='video'){const v=el('video');v.src=url||'';v.controls=true;mb.appendChild(v)}else{const img=el('img');img.src=url||'';mb.appendChild(img)}
+    inner.appendChild(mb);
+  }else{const e=el('div','empty');e.style.gridColumn='';e.appendChild(el('div','big','▦'));e.appendChild(el('div',null,'メディアがまだアップロードされていません'));inner.appendChild(e)}
 
   if(shot.versions.length){
     const vlist=el('div','version-list');
-    shot.versions.forEach(v=>{
-      const chip=el('div','version-chip'+(version&&v.id===version.id?' active':''));
-      const dot=el('span','status-dot');dot.style.background=STEP_STATUS[reviewToStep(v.review.status)].color;
-      chip.appendChild(dot);chip.appendChild(document.createTextNode(v.name));
-      chip.onclick=()=>{state.activeVersionId=v.id;refreshShotDetail()};vlist.appendChild(chip);
-    });
+    shot.versions.forEach(v=>{const chip=el('div','version-chip'+(version&&v.id===version.id?' active':''));const d=el('span','status-dot');d.style.background=STEP_STATUS[reviewToStep(v.review.status)].color;chip.appendChild(d);chip.appendChild(document.createTextNode(v.name));chip.onclick=()=>{state.activeVersionId=v.id;refreshShotDetail()};vlist.appendChild(chip)});
     inner.appendChild(vlist);
   }
 
   if(version){
-    inner.appendChild(el('div','section-title','ディレクターチェック'));
+    inner.appendChild(el('div','section-label','ディレクターチェック'));
     const cur=REVIEW_STATUS[version.review.status];
-    const line=el('div');line.style.marginBottom='6px';line.appendChild(document.createTextNode('現在の判定: '));
-    line.appendChild(el('span','badge '+cur.cls,cur.label));inner.appendChild(line);
+    const line=el('div','review-status-line');line.appendChild(document.createTextNode('現在の判定'));const rb=el('span','rbadge badge-'+cur.cls,cur.label);line.appendChild(rb);line.appendChild(el('span',null,'　by '+(version.uploadedBy||'-')+'・'+fmt(version.uploadedAt)));inner.appendChild(line);
     const acts=el('div','review-actions');
-    const mk=(label,cls,st)=>{const b=el('button','btn '+cls,label);b.onclick=()=>setReview(version.id,st);return b};
-    acts.appendChild(mk('OK（承認）','ok','approved'));acts.appendChild(mk('リテイク','retake','retake'));
-    acts.appendChild(mk('NG','reject','rejected'));acts.appendChild(mk('保留','ghost','pending'));
-    inner.appendChild(acts);
+    const mk=(l,c,st)=>{const b=el('button','btn '+c,l);b.onclick=()=>setReview(version.id,st);return b};
+    acts.appendChild(mk('OK（承認）','ok','approved'));acts.appendChild(mk('リテイク','retake','retake'));acts.appendChild(mk('NG','reject','rejected'));acts.appendChild(mk('保留','btn-ghost','pending'));inner.appendChild(acts);
 
-    inner.appendChild(el('div','section-title','コメント'));
+    inner.appendChild(el('div','section-label','コメント'));
     const notes=el('div','notes');
-    if(!version.review.notes.length)notes.appendChild(el('div','sub','コメントはまだありません。'));
+    if(!version.review.notes.length)notes.appendChild(el('div','form-label','コメントはまだありません。'));
     for(const n of version.review.notes){const note=el('div','note');note.appendChild(el('div','meta',n.author+'・'+fmt(n.time)));note.appendChild(el('div',null,n.text));notes.appendChild(note)}
-    const iw=el('div','note-input');const input=el('input');input.placeholder='コメントを入力...';
-    const sb=el('button','btn','送信');
+    const iw=el('div','note-input');const input=el('input','form-input');input.placeholder='コメントを入力...';const sb=el('button','btn btn-primary','送信');
     const send=async()=>{if(!input.value.trim())return;version.review.notes.push({author:currentUser(),text:input.value.trim(),time:nowIso()});await persist();input.value='';refreshShotDetail()};
-    sb.onclick=send;input.onkeydown=e=>{if(e.key==='Enter')send()};
-    iw.appendChild(input);iw.appendChild(sb);notes.appendChild(iw);inner.appendChild(notes);
+    sb.onclick=send;input.onkeydown=e=>{if(e.key==='Enter')send()};iw.appendChild(input);iw.appendChild(sb);notes.appendChild(iw);inner.appendChild(notes);
   }
 
-  inner.appendChild(el('div','section-title','バージョンをアップロード（動画・画像）'));
-  const fileInput=el('input');fileInput.type='file';fileInput.accept='image/*,video/*';
+  inner.appendChild(el('div','section-label','バージョンをアップロード（動画・画像）'));
+  const drop=el('label','file-drop');drop.innerHTML='<div>クリックして動画・画像を選択（ローカルフォルダに格納されます）</div>';
+  const fileInput=el('input');fileInput.type='file';fileInput.accept='image/*,video/*';drop.appendChild(fileInput);
   const prog=el('div','uploading hidden');const bar=el('div','bar');const barI=el('i');bar.appendChild(barI);const pct=el('span',null,'処理中...');prog.appendChild(bar);prog.appendChild(pct);
   fileInput.onchange=()=>{if(fileInput.files[0])uploadVersion(shot,fileInput.files[0],{prog,barI,pct})};
-  inner.appendChild(fileInput);inner.appendChild(prog);
+  inner.appendChild(drop);inner.appendChild(prog);
 
-  inner.appendChild(el('div','section-title','工程ステータス'));
-  const grid=el('div','step-status-grid');
-  for(const step of state.project.steps||[]){
-    const row=el('div','step-status-row');const name=el('div','name');
-    const dot=el('span');dot.style.cssText='width:10px;height:10px;border-radius:50%;background:'+step.color;
-    name.appendChild(dot);name.appendChild(document.createTextNode(step.name));
-    const sel=el('select');for(const[k,info]of Object.entries(STEP_STATUS))sel.appendChild(new Option(info.label,k));
-    sel.value=shot.stepStatuses[step.id]||'not_started';
-    sel.onchange=async()=>{shot.stepStatuses[step.id]=sel.value;await persist()};
-    row.appendChild(name);row.appendChild(sel);grid.appendChild(row);
-  }
+  inner.appendChild(el('div','section-label','工程ステータス'));
+  const grid=el('div','step-grid');
+  for(const step of state.project.steps||[]){const row=el('div','step-row');const name=el('div','name');const d=el('span');d.style.cssText='width:10px;height:10px;border-radius:50%;background:'+step.color;name.appendChild(d);name.appendChild(document.createTextNode(step.name));const sel=el('select');for(const[k,info]of Object.entries(STEP_STATUS))sel.appendChild(new Option(info.label,k));sel.value=shot.stepStatuses[step.id]||'not_started';sel.onchange=async()=>{shot.stepStatuses[step.id]=sel.value;await persist();updateGridCardFor(shot)};row.appendChild(name);row.appendChild(sel);grid.appendChild(row)}
   inner.appendChild(grid);
 
-  const footer=el('div','form-actions');
-  const del=el('button','btn ghost small','このショットを削除');
-  del.onclick=async()=>{
-    if(!confirm('ショット「'+shot.name+'」を削除しますか？'))return;
-    for(const v of shot.versions){await storage.delMedia(v.file);await storage.delMedia(v.thumb)}
-    DB.shots=DB.shots.filter(s=>s.id!==shot.id);await persist();closeModal();render();resolveShotThumbs();
-  };
-  footer.appendChild(del);inner.appendChild(footer);
+  const del=el('button','btn btn-danger','このショットを削除');del.onclick=async()=>{await deleteShot(shot);closeModal()};
+  modalFooter(body,[del]);
 }
 
-/* ---- レビュー更新 ---- */
 async function setReview(versionId,status){
-  for(const shot of DB.shots){const v=shot.versions.find(x=>x.id===versionId);if(v){v.review.status=status;break}}
-  await persist();refreshShotDetail();if(state.view==='project'){const h=$('#view .grid-shots');if(h&&h.parentElement){renderShotGrid(h.parentElement);resolveShotThumbs()}}
-  toast('判定を更新しました: '+REVIEW_STATUS[status].label);
+  let owner=null;
+  for(const shot of DB.shots){const v=shot.versions.find(x=>x.id===versionId);if(v){v.review.status=status;owner=shot;break}}
+  await persist();refreshShotDetail();if(owner)updateGridCardFor(owner);
+  toast('判定を更新: '+REVIEW_STATUS[status].label);
 }
+function updateGridCardFor(){if(state.view==='project'){renderGrid();resolveThumbs()}}
 
-/* ---- アップロード（ローカルフォルダへ格納） ---- */
+/* ---- アップロード ---- */
 async function uploadVersion(shot,file,ui){
   ui.prog.classList.remove('hidden');ui.pct.textContent='サムネイル生成中...';ui.barI.style.width='30%';
   const isVideo=file.type.startsWith('video/');
   try{
     const thumbDataUrl=await generateThumbnail(file);
     ui.pct.textContent='保存中...';ui.barI.style.width='60%';
-    const ext=(file.name.match(/\.[^.]+$/)||[''])[0];
-    const id=newId('media');
+    const ext=(file.name.match(/\.[^.]+$/)||[''])[0];const id=newId('media');
     const mediaRef=await storage.putMedia('media',id+ext,file);
     let thumbRef=null;
     if(thumbDataUrl){const blob=await(await fetch(thumbDataUrl)).blob();thumbRef=await storage.putMedia('thumbnails',id+'.jpg',blob)}
-    else if(!isVideo){thumbRef=mediaRef}
+    else if(!isVideo)thumbRef=mediaRef;
     const version={id:newId('ver'),name:'v'+(shot.versions.length+1),type:isVideo?'video':'image',file:mediaRef,thumb:thumbRef,uploadedBy:currentUser(),uploadedAt:nowIso(),review:{status:'pending',notes:[]}};
-    shot.versions.push(version);
-    if(thumbRef)shot.thumbnail=thumbRef;
-    await persist();
-    ui.barI.style.width='100%';state.activeVersionId=version.id;
-    refreshShotDetail();
-    if(state.view==='project'){const h=$('#view .grid-shots');if(h&&h.parentElement){renderShotGrid(h.parentElement);resolveShotThumbs()}}
-    toast('アップロード完了');
+    shot.versions.push(version);if(thumbRef)shot.thumbnail=thumbRef;
+    await persist();ui.barI.style.width='100%';state.activeVersionId=version.id;refreshShotDetail();updateGridCardFor(shot);toast('アップロード完了');
   }catch(e){ui.prog.classList.add('hidden');toast('アップロード失敗: '+e.message)}
 }
-
-/* ---- クライアント側サムネイル生成 ---- */
 function generateThumbnail(file){
   return new Promise(resolve=>{
     const isVideo=file.type.startsWith('video/');const url=URL.createObjectURL(file);
-    const done=cv=>{URL.revokeObjectURL(url);resolve(cv?cv.toDataURL('image/jpeg',0.7):null)};
+    const done=cv=>{URL.revokeObjectURL(url);resolve(cv?cv.toDataURL('image/jpeg',0.72):null)};
     const draw=(src,w,h)=>{const scale=Math.min(1,640/w);const cv=document.createElement('canvas');cv.width=Math.round(w*scale);cv.height=Math.round(h*scale);cv.getContext('2d').drawImage(src,0,0,cv.width,cv.height);return cv};
-    if(isVideo){
-      const vid=document.createElement('video');vid.preload='metadata';vid.muted=true;vid.src=url;
-      vid.onloadeddata=()=>{try{vid.currentTime=Math.min(1,(vid.duration||2)/2)}catch(_){}};
-      vid.onseeked=()=>{try{done(draw(vid,vid.videoWidth,vid.videoHeight))}catch(_){done(null)}};
-      vid.onerror=()=>done(null);
-    }else{
-      const img=new Image();img.onload=()=>done(draw(img,img.naturalWidth,img.naturalHeight));img.onerror=()=>done(null);img.src=url;
-    }
+    if(isVideo){const vid=document.createElement('video');vid.preload='metadata';vid.muted=true;vid.src=url;vid.onloadeddata=()=>{try{vid.currentTime=Math.min(1,(vid.duration||2)/2)}catch(_){}};vid.onseeked=()=>{try{done(draw(vid,vid.videoWidth,vid.videoHeight))}catch(_){done(null)}};vid.onerror=()=>done(null)}
+    else{const img=new Image();img.onload=()=>done(draw(img,img.naturalWidth,img.naturalHeight));img.onerror=()=>done(null);img.src=url}
   });
 }
 
 /* ============================================================
-   初期化
+   イベント / 初期化
    ============================================================ */
-$('#brand').onclick=()=>{if(storage.mode)go('projects')};
-$('#reconnectBtn').onclick=connectFlow;
+$('#homeBtn').onclick=()=>{if(storage.mode)go('projects')};
+$('#folderStatus').onclick=connectFlow;
+$('#addBtn').onclick=()=>{if(state.view==='project')openShotModal();else openProjectModal()};
+$('#searchInput').oninput=e=>{state.search=e.target.value;renderGrid();resolveThumbs()};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 (async()=>{
-  let prevMode=null;try{prevMode=localStorage.getItem('layna_mode')}catch(_){}
+  let prev=null;try{prev=localStorage.getItem('layna_mode')}catch(_){}
   try{
-    const ok=await storage.tryReconnect();
-    if(ok){await boot();return}
-    // フォルダ再接続が保留中ならゲートで再許可を促す
+    if(await storage.tryReconnect()){await boot();return}
     if(storage._pending){renderGate();return}
-    // 前回ブラウザ内保存を選んでいた場合は自動再開
-    if(prevMode==='idb'){storage.useIdb();await boot();return}
+    if(prev==='idb'){storage.useIdb();await boot();return}
     renderGate();
   }catch(e){renderGate()}
 })();
