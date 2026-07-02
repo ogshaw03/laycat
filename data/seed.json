@@ -1,0 +1,39 @@
+{
+  "pipelineTemplates": [
+    {
+      "id": "tpl_cg_standard",
+      "name": "標準CGパイプライン",
+      "description": "OGPipeline の標準的なCG工程設定を踏襲したテンプレート",
+      "steps": [
+        { "id": "step_layout", "name": "レイアウト", "color": "#6b7cff", "order": 1 },
+        { "id": "step_anim", "name": "アニメーション", "color": "#38bdf8", "order": 2 },
+        { "id": "step_fx", "name": "エフェクト", "color": "#a855f7", "order": 3 },
+        { "id": "step_light", "name": "ライティング", "color": "#f59e0b", "order": 4 },
+        { "id": "step_comp", "name": "コンポジット", "color": "#22c55e", "order": 5 }
+      ]
+    },
+    {
+      "id": "tpl_2d",
+      "name": "2D/作画パイプライン",
+      "description": "作画・仕上げ・撮影の2D向け工程",
+      "steps": [
+        { "id": "step_lo", "name": "レイアウト", "color": "#6b7cff", "order": 1 },
+        { "id": "step_genga", "name": "原画", "color": "#38bdf8", "order": 2 },
+        { "id": "step_douga", "name": "動画", "color": "#a855f7", "order": 3 },
+        { "id": "step_shiage", "name": "仕上げ", "color": "#f59e0b", "order": 4 },
+        { "id": "step_satsuei", "name": "撮影", "color": "#22c55e", "order": 5 }
+      ]
+    },
+    {
+      "id": "tpl_simple",
+      "name": "シンプル（制作→チェック）",
+      "description": "工程を最小限にした汎用テンプレート",
+      "steps": [
+        { "id": "step_prod", "name": "制作", "color": "#38bdf8", "order": 1 },
+        { "id": "step_check", "name": "チェック", "color": "#22c55e", "order": 2 }
+      ]
+    }
+  ],
+  "projects": [],
+  "shots": []
+}

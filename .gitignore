@@ -1,0 +1,15 @@
+node_modules/
+
+# アップロードされたメディアの実体（このツール用のローカル格納先）
+storage/media/
+storage/thumbnails/
+
+# ランタイムで生成されるメタデータ（サンプルは data/seed.json で管理）
+data/db.json
+
+# OS / エディタ
+.DS_Store
+*.log
+npm-debug.log*
+.vscode/
+.idea/

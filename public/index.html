@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Layna — プロジェクト管理 / レビュー</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand" id="brand">
+        <span class="logo">◐</span> Layna
+      </div>
+      <nav class="breadcrumb" id="breadcrumb"></nav>
+      <div class="spacer"></div>
+      <label class="user-field">
+        <span>ユーザー</span>
+        <input id="currentUser" type="text" placeholder="名前" />
+      </label>
+    </header>
+
+    <main id="view"></main>
+
+    <!-- ショット詳細 / レビュー用モーダル -->
+    <div class="modal-overlay hidden" id="modal">
+      <div class="modal" id="modalBody"></div>
+    </div>
+
+    <template id="tpl-project-card">
+      <article class="project-card">
+        <h3 class="pc-name"></h3>
+        <p class="pc-desc"></p>
+        <div class="pc-steps"></div>
+        <div class="pc-meta"><span class="pc-count"></span></div>
+      </article>
+    </template>
+
+    <template id="tpl-shot-tile">
+      <article class="shot-tile">
+        <div class="st-thumb"></div>
+        <div class="st-body">
+          <div class="st-head">
+            <span class="st-name"></span>
+            <span class="st-badge"></span>
+          </div>
+          <div class="st-steps"></div>
+        </div>
+      </article>
+    </template>
+
+    <script src="/js/app.js"></script>
+  </body>
+</html>
