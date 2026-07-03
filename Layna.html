@@ -1510,26 +1510,42 @@ function slBuild(){
 
 /* ============================================================
    進捗管理（別ウィンドウ）
-   プロジェクト（ルート）ごとに、工程＝ステータスの分布を
-   表と円グラフ（ドーナツ）で可視化する。
+   OGPipeline のショットリストを踏襲。
+   「ショット親」を指定 → 直下がショット、ショット直下のフォルダ名が
+   工程（ステータス）。工程ごとの最新動画（アップロード時刻）を比較し、
+   最も新しい動画がある工程がそのショットの現在の進捗になる。
    ============================================================ */
 let pgWin=null;const pgUI={};
-function progressData(){
-  /* ルートプロジェクトごとに、配下レビューページのステータス分布を集計 */
-  const roots=DB.nodes.filter(n=>!n.parentId);
-  return roots.map(root=>{
-    const revs=[root,...descendants(root.id)].filter(n=>n.type==='review');
-    const sts=projStatuses(root);
-    const buckets=sts.map(s=>({id:s.id,label:s.label,color:s.color,count:0}));
-    const emptyB={id:'empty',label:'未着手',color:'#5a5a6a',count:0};
-    const byId=Object.fromEntries(buckets.map(b=>[b.id,b]));
-    for(const r of revs){
-      const id=nodeStatus(r);
-      if(id==='empty'||!byId[id])emptyB.count++;else byId[id].count++;
-    }
-    const rows=buckets.concat(emptyB.count?[emptyB]:[]);
-    return {root,total:revs.length,rows};
-  });
+/* 工程の表示順（Pipeline _stage_rank 準拠）: lay系→anm系→その他、同順位は名前順 */
+function stageRank(name){const low=(name||'').toLowerCase();let r;if(low.startsWith('lay')||low.startsWith('layout'))r=0;else if(low.startsWith('anm')||low.startsWith('anim'))r=1;else r=2;return [r,low];}
+function stageRankCmp(a,b){const ra=stageRank(a),rb=stageRank(b);return ra[0]-rb[0]||(ra[1]<rb[1]?-1:ra[1]>rb[1]?1:0);}
+/* 工程カラー（Pipeline stage_color 準拠：固定マップ＋文字コードハッシュ） */
+const STAGE_COLOR_MAP={lay_pri:'#4a90d9',lay_anm:'#5fb878',anm_pri:'#e8a838',anm_sec:'#d9734a'};
+const STAGE_PALETTE=['#4a90d9','#5fb878','#e8a838','#d9734a','#9b6dd6','#46c4b8','#d96d9e','#c5c043'];
+function stageColor(stage){if(!stage)return '#5a5a6a';const key=stage.toLowerCase().split('/').pop();if(STAGE_COLOR_MAP[key])return STAGE_COLOR_MAP[key];let h=0;for(const c of stage.toLowerCase())h+=c.charCodeAt(0);return STAGE_PALETTE[h%STAGE_PALETTE.length];}
+/* ノード配下（自身＋子孫）にある最新動画のアップロード時刻（ISO文字列/なければnull） */
+function latestVideoTimeUnder(nodeId){let best=null;const ns=[getNode(nodeId),...descendants(nodeId)];for(const n of ns)if(n)for(const v of (n.versions||[]))if(v.type==='video'){const t=v.uploadedAt||'';if(best===null||t>best)best=t}return best;}
+/* ショットの工程一覧（直下フォルダ＝工程）。time は各工程配下の最新動画時刻 */
+function shotStages(shot){return childrenOf(shot.id).map(st=>({name:st.name,node:st,time:latestVideoTimeUnder(st.id)}));}
+/* ショットの現在工程 = 最も新しい動画が上がっている工程（Pipeline _shot_latest の media 分岐相当） */
+function shotCurrentStage(shot){const withVid=shotStages(shot).filter(s=>s.time);if(!withVid.length)return null;withVid.sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);return withVid[withVid.length-1].name;}
+/* 「ショット親」候補 = 孫を持つノード（＝直下がショット、その下が工程）。無ければルート */
+function shotParentCandidates(){const c=DB.nodes.filter(n=>childrenOf(n.id).some(ch=>childrenOf(ch.id).length>0));return c.length?c:DB.nodes.filter(n=>!n.parentId);}
+function progressData(parentId){
+  const parent=getNode(parentId);
+  const shots=childrenOf(parentId);
+  const counts={};const perShot=[];
+  for(const shot of shots){
+    const cur=shotCurrentStage(shot);
+    perShot.push({shot,stage:cur});
+    counts[cur||'__none__']=(counts[cur||'__none__']||0)+1;
+  }
+  /* 全ショットで検出された工程名の集合（現在工程でなくても列挙） */
+  const stageNames=[...new Set(shots.flatMap(s=>childrenOf(s.id).map(c=>c.name)))].sort(stageRankCmp);
+  const rows=stageNames.map(nm=>({id:nm,label:nm,color:stageColor(nm),count:counts[nm]||0}));
+  const none=counts['__none__']||0;
+  if(none)rows.push({id:'__none__',label:'未着手',color:'#5a5a6a',count:none});
+  return {parent,total:shots.length,rows,perShot};
 }
 function drawDonut(cv,rows,total){
   const c=cv.getContext('2d');const W=cv.width,H=cv.height;c.clearRect(0,0,W,H);
@@ -1575,12 +1591,23 @@ function openProgress(){
   +'.bar>i{display:block;height:100%;border-radius:4px}'
   +'.num{font-variant-numeric:tabular-nums;text-align:right}'
   +'.trow.done td{color:#5a5a6a}'
+  +'.selrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}'
+  +'.selrow label{font-size:11px;color:#8a8a9a;letter-spacing:.5px}'
+  +'.selrow select{background:#1c1c1f;color:#e8e8ec;border:1px solid #2a2a2f;border-radius:6px;padding:6px 10px;font-size:12px;max-width:520px}'
+  +'.selrow .cnt{color:#5a5a6a;font-size:11px}'
+  +'.sect-h{font-size:10px;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;margin:18px 2px 8px}'
+  +'.badge2{display:inline-block;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:600;color:#101013}'
+  +'.stbl{border-collapse:collapse;width:100%}'
+  +'.stbl th{text-align:left;font-size:10px;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:5px 8px;border-bottom:1px solid #2a2a2f}'
+  +'.stbl td{padding:7px 8px;border-bottom:1px solid #1f1f24;vertical-align:middle}'
+  +'.stbl tr:hover td{background:#17171b}'
+  +'.stbl .sn{font-weight:600}.stbl .sp2{color:#5a5a6a;font-size:11px}'
   +'.empty{color:#5a5a6a;padding:50px;text-align:center}';
   d.head.appendChild(st);
   const ce2=(t,c,x)=>{const e=d.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
   const hd=ce2('div','hd');
   hd.appendChild(ce2('div','logo','📊 進捗管理 / Layna'));
-  hd.appendChild(ce2('span','sub','工程（ステータス）ごとの進捗を円グラフと表で確認'));
+  hd.appendChild(ce2('span','sub','ショット親を指定 → 工程（子フォルダ名）ごとに最新動画のある工程が現在の進捗'));
   hd.appendChild(ce2('div','sp'));
   const rf=ce2('button','btn','↻ 更新');hd.appendChild(rf);
   d.body.appendChild(hd);
@@ -1592,35 +1619,61 @@ function openProgress(){
 function pgBuild(){
   if(!pgWin||pgWin.closed)return;
   const {ce2,wrap}=pgUI;wrap.innerHTML='';
-  const data=progressData();
-  if(!data.length){wrap.appendChild(ce2('div','empty','プロジェクトがありません'));return}
-  for(const p of data){
-    const card=ce2('div','pcard');
-    const ph=ce2('div','ph');
-    ph.appendChild(ce2('span','pn',p.root.name));
-    ph.appendChild(ce2('span','pc','レビューページ '+p.total+' 件'));
-    card.appendChild(ph);
-    const body=ce2('div','pbody');
-    const cv=ce2('canvas');cv.width=180;cv.height=180;body.appendChild(cv);
-    drawDonut(cv,p.rows,p.total);
-    const tbl=ce2('table','ptbl');
-    const thead=ce2('tr');['工程 / ステータス','件数','割合','進捗'].forEach(h=>thead.appendChild(ce2('th',null,h)));
-    tbl.appendChild(thead);
-    for(const r of p.rows){
-      const tr=ce2('tr','trow'+(r.id==='empty'?' done':''));
-      const c1=ce2('td');const sw=ce2('span','sw');sw.style.background=r.color;c1.appendChild(sw);c1.appendChild(d3txt(ce2,r.label));tr.appendChild(c1);
-      tr.appendChild(ce2('td','num',String(r.count)));
-      const pct=p.total?Math.round(r.count/p.total*100):0;
-      tr.appendChild(ce2('td','pct',pct+'%'));
-      const c4=ce2('td');const bar=ce2('div','bar');const fill=ce2('i');fill.style.width=pct+'%';fill.style.background=r.color;bar.appendChild(fill);c4.appendChild(bar);tr.appendChild(c4);
-      tbl.appendChild(tr);
-    }
-    body.appendChild(tbl);
-    card.appendChild(body);
-    wrap.appendChild(card);
+  const cands=shotParentCandidates();
+  if(!cands.length){wrap.appendChild(ce2('div','empty','フォルダがありません。ショット→工程の階層を作成してください。'));return}
+  if(!pgUI.parentId||!cands.some(c=>c.id===pgUI.parentId))pgUI.parentId=cands[0].id;
+  /* ショット親セレクタ */
+  const selrow=ce2('div','selrow');
+  selrow.appendChild(ce2('label',null,'ショット親フォルダ'));
+  const sel=ce2('select');
+  for(const c of cands){const o=ce2('option',null,pathOf(c.id).map(x=>x.name).join(' / '));o.value=c.id;if(c.id===pgUI.parentId)o.selected=true;sel.appendChild(o)}
+  sel.onchange=()=>{pgUI.parentId=sel.value;pgBuild()};
+  selrow.appendChild(sel);
+  wrap.appendChild(selrow);
+  const p=progressData(pgUI.parentId);
+  selrow.appendChild(ce2('span','cnt','ショット '+p.total+' 件'));
+  if(!p.total){wrap.appendChild(ce2('div','empty','このフォルダ直下にショットがありません。'));return}
+  /* 工程別 集計（円グラフ＋表） */
+  const card=ce2('div','pcard');
+  const ph=ce2('div','ph');
+  ph.appendChild(ce2('span','pn',p.parent?p.parent.name:'—'));
+  ph.appendChild(ce2('span','pc','ショット '+p.total+' 件 / 工程で色分け'));
+  card.appendChild(ph);
+  const body=ce2('div','pbody');
+  const cv=ce2('canvas');cv.width=180;cv.height=180;body.appendChild(cv);
+  drawDonut(cv,p.rows,p.total);
+  const tbl=ce2('table','ptbl');
+  const thead=ce2('tr');['工程','ショット数','割合','進捗'].forEach(h=>thead.appendChild(ce2('th',null,h)));
+  tbl.appendChild(thead);
+  for(const r of p.rows){
+    const tr=ce2('tr','trow'+(r.id==='__none__'?' done':''));
+    const c1=ce2('td');const sw=ce2('span','sw');sw.style.background=r.color;c1.appendChild(sw);c1.appendChild(ce2('span',null,r.label));tr.appendChild(c1);
+    tr.appendChild(ce2('td','num',String(r.count)));
+    const pct=p.total?Math.round(r.count/p.total*100):0;
+    tr.appendChild(ce2('td','pct',pct+'%'));
+    const c4=ce2('td');const bar=ce2('div','bar');const fill=ce2('i');fill.style.width=pct+'%';fill.style.background=r.color;bar.appendChild(fill);c4.appendChild(bar);tr.appendChild(c4);
+    tbl.appendChild(tr);
   }
+  body.appendChild(tbl);
+  card.appendChild(body);
+  wrap.appendChild(card);
+  /* ショット別 現在工程の一覧 */
+  wrap.appendChild(ce2('div','sect-h','ショット別 現在の工程'));
+  const st=ce2('table','stbl');
+  const sth=ce2('tr');['ショット','現在の工程','工程数'].forEach(h=>sth.appendChild(ce2('th',null,h)));
+  st.appendChild(sth);
+  for(const {shot,stage} of p.perShot){
+    const tr=ce2('tr');
+    const c1=ce2('td');c1.appendChild(ce2('span','sn',shot.name));c1.appendChild(ce2('div','sp2',pathOf(shot.id).slice(0,-1).map(x=>x.name).join(' / ')||'—'));tr.appendChild(c1);
+    const c2=ce2('td');
+    if(stage){const b=ce2('span','badge2',stage);b.style.background=stageColor(stage);c2.appendChild(b)}
+    else c2.appendChild(ce2('span','sp2','未着手'));
+    tr.appendChild(c2);
+    tr.appendChild(ce2('td','num',String(childrenOf(shot.id).length)));
+    st.appendChild(tr);
+  }
+  wrap.appendChild(st);
 }
-function d3txt(ce2,t){return ce2('span',null,t)}
 
 /* ============================================================
    REEL — シーケンスプレイヤー（別ウィンドウ）
