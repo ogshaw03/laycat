@@ -86,6 +86,52 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .ico{width:1.05em;height:1.05em;vertical-align:-0.16em;flex-shrink:0}
 button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-chip .ico{margin-right:.4em}
 .ico+*{vertical-align:middle}
+/* プロジェクトのタブ（タイムライン / 進捗 / ショット） */
+.ptab-nav{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:2px 0 18px}
+.ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.5px;padding:9px 18px;cursor:pointer;margin-bottom:-1px}
+.ptab:hover{color:var(--text)}
+.ptab.on{color:var(--text);border-bottom-color:var(--edge)}
+/* タブ内の進捗・ショット（メインウィンドウ埋め込み版） */
+.pm-sel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.pm-sel label{font-size:11px;color:var(--text3)}
+.pm-sel select{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;max-width:460px}
+.pm-tabs{display:flex;gap:6px;margin-bottom:16px}
+.pm-stab{background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:7px;padding:7px 15px;font-size:13px;font-weight:600;cursor:pointer}
+.pm-stab:hover{color:var(--text)}
+.pm-stab.on{background:rgba(96,165,255,.16);border-color:var(--edge);color:var(--text)}
+.pm-card{border:1px solid var(--border);border-radius:12px;background:var(--bg2);padding:16px 18px;margin-bottom:6px}
+.pm-body{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+.pm-body canvas{flex-shrink:0;cursor:pointer}
+.pm-ptbl{flex:1;min-width:320px;border-collapse:collapse}
+.pm-ptbl th{text-align:left;font-size:10px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;padding:4px 8px;border-bottom:1px solid var(--border)}
+.pm-ptbl td{padding:6px 8px;border-bottom:1px solid var(--bg3);vertical-align:middle;cursor:pointer}
+.pm-ptbl tr:hover td{background:var(--bg3)}
+.pm-ptbl tr.pick td{background:rgba(96,165,255,.12)}
+.pm-sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+.pm-bar{height:7px;border-radius:4px;background:var(--bg3);overflow:hidden;min-width:80px}
+.pm-bar>i{display:block;height:100%;border-radius:4px}
+.pm-num{text-align:right;font-variant-numeric:tabular-nums}
+.pm-pct{color:var(--text3);font-variant-numeric:tabular-nums}
+.pm-h{font-family:var(--font-head);font-size:10px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin:22px 2px 10px}
+.pm-badge{display:inline-block;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;color:#101013}
+.pm-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.pm-tile{border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--bg2)}
+.pm-tile:hover{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
+.pm-tile .th{aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
+.pm-tile .th img{width:100%;height:100%;object-fit:cover}
+.pm-tile .bd{padding:7px 9px}.pm-tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-tile .mt{display:flex;align-items:center;gap:6px;margin-top:5px}.pm-tile .pth{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-stbl{border-collapse:collapse;width:100%}
+.pm-stbl th{text-align:left;font-size:10px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;padding:5px 8px;border-bottom:1px solid var(--border)}
+.pm-stbl td{padding:7px 8px;border-bottom:1px solid var(--bg3)}
+.pm-stbl .sn{font-weight:600}
+.pm-empty{color:var(--text3);padding:44px;text-align:center}
+.pm-mod{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;flex-direction:column;z-index:400}
+.pm-mod.on{display:flex}
+.pm-mod .top{display:flex;align-items:center;gap:10px;padding:12px 16px;color:var(--text)}
+.pm-mod .top .sp{flex:1}
+.pm-mod .bd{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 16px 16px}
+.pm-mod video{max-width:100%;max-height:100%}
 /* プロジェクトのタイムライン・ホーム */
 /* ホーム画面（プロジェクト選択）— シンプルなランチャー風 */
 .home-screen{max-width:1120px;margin:0 auto;padding:30px 10px 50px}
@@ -94,13 +140,10 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .home-hd .hs{color:var(--text3);font-size:13px;margin-top:7px}
 .proj-grid{display:grid;gap:24px;grid-template-columns:repeat(auto-fill,272px);justify-content:center}
 .proj-card{border:1px solid var(--edge);border-radius:16px;overflow:hidden;background:var(--bg);cursor:pointer;box-shadow:0 0 10px var(--edgeglow);transition:box-shadow .2s ease,border-color .2s ease}
-.proj-card:hover{animation:tile-beat 1.15s ease-in-out infinite}
+.proj-card:hover{animation:tile-beat 2.6s ease-in-out infinite}
 @keyframes tile-beat{
-  0%,100%{box-shadow:0 0 8px rgba(96,165,255,.18);border-color:rgba(96,165,255,.55)}
-  14%{box-shadow:0 0 30px rgba(120,180,255,.85);border-color:rgba(160,200,255,1)}
-  28%{box-shadow:0 0 10px rgba(96,165,255,.28);border-color:rgba(96,165,255,.65)}
-  42%{box-shadow:0 0 30px rgba(120,180,255,.85);border-color:rgba(160,200,255,1)}
-  60%{box-shadow:0 0 8px rgba(96,165,255,.18);border-color:rgba(96,165,255,.55)}
+  0%,100%{box-shadow:0 0 8px rgba(96,165,255,.14);border-color:rgba(96,165,255,.5)}
+  50%{box-shadow:0 0 16px rgba(96,165,255,.4);border-color:rgba(120,180,255,.85)}
 }
 .proj-media{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;position:relative}
 .proj-media img{width:100%;height:100%;object-fit:cover;display:block}
@@ -371,8 +414,6 @@ textarea.form-input{height:70px;resize:vertical}
   <button class="home-btn" id="homeBtn" title="トップへ">◐</button>
   <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
   <div class="header-actions">
-    <button class="btn btn-ghost" id="shotListBtn" title="ショットリスト — 全ショットの最新動画をタイル一覧（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5.5h11M6 10h11M6 14.5h11"/><path d="M3 5.5h.01M3 10h.01M3 14.5h.01"/></svg>ショット</button>
-    <button class="btn btn-ghost" id="progressBtn" title="進捗管理 — 工程ごとのステータスを表と円グラフで確認（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v14h14"/><path d="M7 13v-3M10.5 13V7M14 13v-5"/></svg>進捗</button>
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
     <div class="size-btns" id="sizeBtns"></div>
     <div class="folder-status" id="folderStatus" title="保存先フォルダ / クリックで変更"><span class="dot"></span><span id="folderName">未接続</span></div>
@@ -580,13 +621,12 @@ function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;t
 /* ============================================================
    ナビ / レンダリング
    ============================================================ */
-function go(id){state.currentId=id;state.search='';$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);render()}
+function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);render()}
 /* ホーム画面ではプロジェクト系ツールのヘッダーボタンを隠し、シンプルに */
 function updateHeaderForContext(){
   const home=!state.currentId;
   const setD=(sel,show)=>{const e=$(sel);if(e)e.style.display=show?'':'none'};
-  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#shotListBtn',!home);
-  setD('#progressBtn',!home);setD('#reelBtn',!home);setD('#sizeBtns',!home);
+  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#sizeBtns',!home);
   setD('#addBtn',true);setD('#mainHead',!home);setD('#breadcrumb',!home);
 }
 function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
@@ -661,8 +701,8 @@ function renderMainHead(){
     }
     h.appendChild(ra);
   }
-  /* プロジェクト（ルート）のタイムライン用・工程フィルタ（右上プルダウン） */
-  if(cur&&!cur.parentId&&!state.search.trim()){
+  /* プロジェクト（ルート）のタイムライン用・工程フィルタ（右上プルダウン。タイムラインタブのみ） */
+  if(cur&&!cur.parentId&&!state.search.trim()&&state.projTab==='timeline'){
     const names=projectStageNames(cur.id);
     const hidden=tlHiddenSet(cur.id);
     const dd=el('div','filter-dd');
@@ -721,39 +761,153 @@ function projectStageNames(rootId){return [...new Set(descendants(rootId).filter
 /* タイムラインで非表示にしている工程名（プロジェクト単位・切替時にリセット） */
 function tlHiddenSet(rootId){if(state.tlHiddenFor!==rootId){state.tlHiddenFor=rootId;state.tlHidden=new Set()}return state.tlHidden;}
 
-/* プロジェクトのトップ＝タイムライン＋右サイドバー（下階層の縦並び） */
+/* プロジェクトのトップ＝タブ（タイムライン / 進捗 / ショット） */
 function renderProjectHome(s,cur){
-  const main=el('div','home-main');
+  if(!['timeline','progress','shots'].includes(state.projTab))state.projTab='timeline';
+  const nav=el('div','ptab-nav');
+  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット']]){
+    const b=el('button','ptab'+(state.projTab===id?' on':''),lab);
+    b.onclick=()=>{if(state.projTab!==id){state.projTab=id;state.pmPick=null;renderMainHead();renderBody();resolveThumbs()}};
+    nav.appendChild(b);
+  }
+  s.appendChild(nav);
+  const main=el('div','home-main');s.appendChild(main);
+  if(state.projTab==='progress')renderProjProgress(main,cur);
+  else if(state.projTab==='shots')renderProjShots(main,cur);
+  else renderProjTimeline(main,cur);
+}
+function renderProjTimeline(main,cur){
   const hidden=tlHiddenSet(cur.id);
   const evs=projectUpdates(cur.id).filter(e=>!hidden.has(e.stage));
-  const lab=el('div','section-label');lab.appendChild(el('span',null,'最新の更新タイムライン'));
-  lab.appendChild(el('span','',''));main.appendChild(lab);
+  const lab=el('div','section-label');lab.appendChild(el('span',null,'最新の更新タイムライン'));main.appendChild(lab);
   if(!evs.length){
     main.appendChild(el('div','empty',projectUpdates(cur.id).length?'表示できる更新がありません。右上の工程フィルタでチェックを追加してください。':'まだ更新がありません。工程（レビュー）に動画をアップロードすると、ここに新着順で表示されます。'));
-  }else{
-    const tl=el('div','tl');
-    for(const e of evs){
-      const it=el('div','tl-item');
-      const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;th.onclick=()=>go(e.node.id);
-      it.appendChild(th);
-      const bd=el('div','tl-body');
-      const shot=e.node.parentId?getNode(e.node.parentId):null;
-      bd.appendChild(el('div','tl-path',pathOf(e.node.id).slice(1,-1).map(x=>x.name).join(' / ')||cur.name));
-      const t=el('div','tl-title');
-      const sb=el('span','tl-stage',e.stage);sb.style.background=stageColor(e.stage);t.appendChild(sb);
-      t.appendChild(el('span',null,(shot?shot.name+'　':'')+e.v.name));
-      t.appendChild(elIco('span','tl-kind','upload','アップロード'));
-      bd.appendChild(t);
-      if(e.comment)bd.appendChild(el('div','tl-comment',e.comment));
-      const st=stInfo(e.node);
-      bd.appendChild(el('div','tl-meta','by '+(e.v.uploadedBy||'-')+'・'+fmt(e.v.uploadedAt)+'　［'+st.label+'］'));
-      it.appendChild(bd);
-      const open=el('button','btn btn-ghost btn-sm','開く');open.style.alignSelf='center';open.onclick=()=>go(e.node.id);it.appendChild(open);
-      tl.appendChild(it);
-    }
-    main.appendChild(tl);
+    return;
   }
-  s.appendChild(main);
+  const tl=el('div','tl');
+  for(const e of evs){
+    const it=el('div','tl-item');
+    const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;th.onclick=()=>go(e.node.id);
+    it.appendChild(th);
+    const bd=el('div','tl-body');
+    const shot=e.node.parentId?getNode(e.node.parentId):null;
+    bd.appendChild(el('div','tl-path',pathOf(e.node.id).slice(1,-1).map(x=>x.name).join(' / ')||cur.name));
+    const t=el('div','tl-title');
+    const sb=el('span','tl-stage',e.stage);sb.style.background=stageColor(e.stage);t.appendChild(sb);
+    t.appendChild(el('span',null,(shot?shot.name+'　':'')+e.v.name));
+    t.appendChild(elIco('span','tl-kind','upload','アップロード'));
+    bd.appendChild(t);
+    if(e.comment)bd.appendChild(el('div','tl-comment',e.comment));
+    const st=stInfo(e.node);
+    bd.appendChild(el('div','tl-meta','by '+(e.v.uploadedBy||'-')+'・'+fmt(e.v.uploadedAt)+'　［'+st.label+'］'));
+    it.appendChild(bd);
+    const open=el('button','btn btn-ghost btn-sm','開く');open.style.alignSelf='center';open.onclick=()=>go(e.node.id);it.appendChild(open);
+    tl.appendChild(it);
+  }
+  main.appendChild(tl);
+}
+/* ショットタブ：プロジェクト配下の各ショットの最新動画をグリッド表示 */
+function renderProjShots(main,cur){
+  const revs=[cur,...descendants(cur.id)].filter(n=>n.type==='review'&&n.versions.some(v=>v.type==='video'));
+  main.appendChild(el('div','pm-h','ショット — 各ショットの最新動画'));
+  if(!revs.length){main.appendChild(el('div','pm-empty','動画のあるショットがありません。工程（レビュー）に動画をアップロードしてください。'));return}
+  const grid=el('div','pm-grid');
+  for(const n of revs){
+    const lv=latestVideoVersionUnder(n.id);const v=lv?lv.v:[...n.versions].reverse().find(x=>x.type==='video');
+    const tile=el('div','pm-tile');
+    const th=el('div','th');if(v&&v.thumb){const img=el('img');img.dataset.ref=v.thumb;th.appendChild(img)}else th.appendChild(icoEl('film'));
+    tile.appendChild(th);
+    const bd=el('div','bd');bd.appendChild(el('div','nm',n.name));
+    bd.appendChild(el('div','pth',pathOf(n.id).slice(1,-1).map(x=>x.name).join(' / ')||cur.name));
+    tile.appendChild(bd);
+    tile.onclick=()=>pmPreview(n,v);
+    grid.appendChild(tile);
+  }
+  main.appendChild(grid);
+}
+/* 進捗タブ用：プロジェクト配下でショット親になり得るノード（孫を持つ） */
+function pmProgressParents(root){const all=[root,...descendants(root.id)];const c=all.filter(n=>childrenOf(n.id).some(ch=>childrenOf(ch.id).length>0));return c.length?c:[root];}
+/* 進捗タブ：工程/ステータスの円グラフ＋表（メイン埋め込み版） */
+function renderProjProgress(main,cur){
+  const cands=pmProgressParents(cur);
+  if(!state.pmParentId||!cands.some(c=>c.id===state.pmParentId))state.pmParentId=cands[0].id;
+  if(state.pmTab!=='status')state.pmTab='stage';
+  if(cands.length>1){
+    const sel=el('div','pm-sel');sel.appendChild(el('label',null,'ショット親フォルダ'));
+    const s=el('select');
+    for(const c of cands){const o=el('option',null,pathOf(c.id).map(x=>x.name).join(' / '));o.value=c.id;if(c.id===state.pmParentId)o.selected=true;s.appendChild(o)}
+    s.onchange=()=>{state.pmParentId=s.value;state.pmPick=null;renderBody();resolveThumbs()};
+    sel.appendChild(s);main.appendChild(sel);
+  }
+  const tabs=el('div','pm-tabs');
+  for(const [id,lab] of [['stage','工程グラフ'],['status','ステータスグラフ']]){
+    const b=el('button','pm-stab'+(state.pmTab===id?' on':''),lab);
+    b.onclick=()=>{if(state.pmTab!==id){state.pmTab=id;state.pmPick=null;renderBody();resolveThumbs()}};
+    tabs.appendChild(b);
+  }
+  main.appendChild(tabs);
+  const p=progressData(state.pmParentId,state.pmTab);
+  if(!p.total){main.appendChild(el('div','pm-empty','このフォルダ直下にショットがありません。'));return}
+  const isStage=state.pmTab==='stage';
+  const card=el('div','pm-card');const body=el('div','pm-body');
+  const cv=el('canvas');cv.width=180;cv.height=180;body.appendChild(cv);
+  const pick=row=>{state.pmPick=(state.pmPick===row.id?null:row.id);renderBody();resolveThumbs()};
+  drawDonut(cv,p.rows,p.total,pick);
+  const tbl=el('table','pm-ptbl');
+  const thead=el('tr');[(isStage?'工程':'ステータス'),'ショット数','割合','進捗'].forEach(h=>thead.appendChild(el('th',null,h)));tbl.appendChild(thead);
+  for(const r of p.rows){
+    const tr=el('tr',state.pmPick===r.id?'pick':null);
+    const c1=el('td');const sw=el('span','pm-sw');sw.style.background=r.color;c1.appendChild(sw);c1.appendChild(el('span',null,r.label));tr.appendChild(c1);
+    tr.appendChild(el('td','pm-num',String(r.count)));
+    const pct=p.total?Math.round(r.count/p.total*100):0;tr.appendChild(el('td','pm-pct',pct+'%'));
+    const c4=el('td');const bar=el('div','pm-bar');const fill=el('i');fill.style.width=pct+'%';fill.style.background=r.color;bar.appendChild(fill);c4.appendChild(bar);tr.appendChild(c4);
+    tr.onclick=()=>pick(r);tbl.appendChild(tr);
+  }
+  body.appendChild(tbl);card.appendChild(body);main.appendChild(card);
+  if(state.pmPick!=null){
+    const row=p.rows.find(r=>r.id===state.pmPick);const hits=p.perShot.filter(ps=>ps.key===state.pmPick);
+    main.appendChild(el('div','pm-h','「'+(row?row.label:'')+'」のショット（'+hits.length+'件）'));
+    const grid=el('div','pm-grid');
+    for(const ps of hits){
+      const tile=el('div','pm-tile');const th=el('div','th');const lv=ps.latest;
+      if(lv&&lv.v.thumb){const img=el('img');img.dataset.ref=lv.v.thumb;th.appendChild(img)}else th.appendChild(icoEl('film'));
+      tile.appendChild(th);
+      const bd=el('div','bd');bd.appendChild(el('div','nm',ps.shot.name));const mt=el('div','mt');
+      const badge=el('span','pm-badge',isStage?(ps.stageName||'未着手'):stInfo(ps.curNode||ps.shot).label);
+      badge.style.background=isStage?stageColor(ps.stageName):(stInfo(ps.curNode||ps.shot).color||'#5a5a6a');mt.appendChild(badge);
+      mt.appendChild(el('span','pth',lv?('最新: '+lv.v.name):'動画なし'));bd.appendChild(mt);tile.appendChild(bd);
+      tile.onclick=()=>{if(lv)pmPreview(ps.shot,lv.v);else toast('このショットには動画がありません')};grid.appendChild(tile);
+    }
+    main.appendChild(grid);
+  }else{
+    main.appendChild(el('div','pm-h','ショット別 現在の'+(isStage?'工程':'ステータス')));
+    const t=el('table','pm-stbl');const th=el('tr');['ショット',(isStage?'現在の工程':'ステータス'),'工程数'].forEach(h=>th.appendChild(el('th',null,h)));t.appendChild(th);
+    for(const ps of p.perShot){
+      const tr=el('tr');const c1=el('td');c1.appendChild(el('span','sn',ps.shot.name));tr.appendChild(c1);
+      const c2=el('td');
+      if(isStage){if(ps.stageName){const b=el('span','pm-badge',ps.stageName);b.style.background=stageColor(ps.stageName);c2.appendChild(b)}else c2.appendChild(el('span','pm-pct','未着手'))}
+      else{const si=stInfo(ps.curNode||ps.shot);if(ps.curNode){const b=el('span','pm-badge',si.label);b.style.background=si.color;c2.appendChild(b)}else c2.appendChild(el('span','pm-pct','未着手'))}
+      tr.appendChild(c2);tr.appendChild(el('td','pm-num',String(ps.stageCount)));t.appendChild(tr);
+    }
+    main.appendChild(t);
+  }
+}
+/* タイル→最新動画のモーダルプレビュー（メインウィンドウ内） */
+function pmPreview(shot,ver){
+  let mod=document.getElementById('pmMod');
+  if(!mod){
+    mod=el('div','pm-mod');mod.id='pmMod';
+    const top=el('div','top');const nm=el('span');nm.id='pmModNm';nm.style.fontWeight='700';const sp=el('div','sp');const cl=el('button','btn btn-ghost btn-sm','✕ 閉じる');
+    const bd=el('div','bd');const vid=el('video');vid.id='pmModVid';vid.controls=true;vid.playsInline=true;bd.appendChild(vid);
+    top.appendChild(nm);top.appendChild(sp);top.appendChild(cl);mod.appendChild(top);mod.appendChild(bd);document.body.appendChild(mod);
+    const close=()=>{mod.classList.remove('on');vid.pause();vid.removeAttribute('src');vid.load()};
+    cl.onclick=close;mod.onclick=e=>{if(e.target===mod)close()};
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&mod.classList.contains('on'))close()});
+  }
+  document.getElementById('pmModNm').textContent=shot.name+(ver?'　'+ver.name:'');
+  mod.classList.add('on');
+  const vid=document.getElementById('pmModVid');
+  (async()=>{const url=ver?await storage.getURL(ver.file):null;if(url){vid.src=url;vid.play().catch(()=>{})}})();
 }
 
 /* ホーム画面（プロジェクト選択）— シンプルなランチャー */
@@ -2543,8 +2697,6 @@ $('#homeBtn').onclick=()=>{if(storage.mode)go(null)};
 $('#folderStatus').onclick=connectFlow;
 $('#addBtn').onclick=headerAdd;
 $('#reelBtn').onclick=()=>{if(storage.mode)openReel()};
-$('#shotListBtn').onclick=()=>{if(storage.mode)openShotList()};
-$('#progressBtn').onclick=()=>{if(storage.mode)openProgress()};
 /* 工程フィルタのプルダウンを外側クリックで閉じる */
 document.addEventListener('click',e=>{const p=document.querySelector('.filter-panel:not(.hidden)');if(p){const dd=p.closest('.filter-dd');if(!dd||!dd.contains(e.target))p.classList.add('hidden')}});
 
