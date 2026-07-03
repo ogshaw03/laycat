@@ -696,18 +696,15 @@ function renderBody(){
   else renderSectionBody(s,cur);
 }
 
-/* プロジェクト（ルート）配下の更新イベントを新着順で。
-   アップロード＋各コメント/アノテーションをすべて含む活動フィード */
+/* プロジェクト（ルート）配下の更新イベント（動画アップロードのみ）を新着順で。
+   コメント追加やステータス変更はタイムラインに出さない */
 function projectUpdates(rootId){
   const evs=[];
   for(const n of descendants(rootId))if(n.type==='review')for(const v of (n.versions||[])){
+    if(v.type!=='video')continue;
     const notes=(v.review&&v.review.notes)||[];
     const upNote=notes.find(x=>x.kind==='upload');
     evs.push({type:'upload',node:n,v,time:v.uploadedAt||'',stage:n.name,comment:upNote?upNote.text:null});
-    for(const nt of notes){
-      if(nt.kind==='upload')continue;
-      evs.push({type:'comment',node:n,v,note:nt,time:nt.time||v.uploadedAt||'',stage:n.name});
-    }
   }
   evs.sort((a,b)=>a.time<b.time?1:a.time>b.time?-1:0);
   return evs;
@@ -729,8 +726,7 @@ function renderProjectHome(s,cur){
   }else{
     const tl=el('div','tl');
     for(const e of evs){
-      const isC=e.type==='comment';
-      const it=el('div','tl-item'+(isC?' is-comment':''));
+      const it=el('div','tl-item');
       const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;th.onclick=()=>go(e.node.id);
       it.appendChild(th);
       const bd=el('div','tl-body');
@@ -739,16 +735,11 @@ function renderProjectHome(s,cur){
       const t=el('div','tl-title');
       const sb=el('span','tl-stage',e.stage);sb.style.background=stageColor(e.stage);t.appendChild(sb);
       t.appendChild(el('span',null,(shot?shot.name+'　':'')+e.v.name));
-      t.appendChild(elIco('span','tl-kind',isC?'comment':'upload',isC?'コメント':'アップロード'));
-      if(isC&&e.note.frame!=null)t.appendChild(el('span','tl-fchip','F'+e.note.frame));
-      if(isC&&e.note.drawing&&e.note.drawing.length)t.appendChild(el('span','tl-fchip','アノテ'));
+      t.appendChild(elIco('span','tl-kind','upload','アップロード'));
       bd.appendChild(t);
-      const txt=isC?e.note.text:e.comment;
-      if(txt)bd.appendChild(el('div','tl-comment',txt));
+      if(e.comment)bd.appendChild(el('div','tl-comment',e.comment));
       const st=stInfo(e.node);
-      const who=isC?(e.note.author||'-'):(e.v.uploadedBy||'-');
-      const when=isC?e.note.time:e.v.uploadedAt;
-      bd.appendChild(el('div','tl-meta','by '+who+'・'+fmt(when)+(isC?'':'　［'+st.label+'］')));
+      bd.appendChild(el('div','tl-meta','by '+(e.v.uploadedBy||'-')+'・'+fmt(e.v.uploadedAt)+'　［'+st.label+'］'));
       it.appendChild(bd);
       const open=el('button','btn btn-ghost btn-sm','開く');open.style.alignSelf='center';open.onclick=()=>go(e.node.id);it.appendChild(open);
       tl.appendChild(it);
