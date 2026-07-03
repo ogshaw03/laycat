@@ -1531,37 +1531,56 @@ function shotStages(shot){return childrenOf(shot.id).map(st=>({name:st.name,node
 function shotCurrentStage(shot){const withVid=shotStages(shot).filter(s=>s.time);if(!withVid.length)return null;withVid.sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);return withVid[withVid.length-1].name;}
 /* 「ショット親」候補 = 孫を持つノード（＝直下がショット、その下が工程）。無ければルート */
 function shotParentCandidates(){const c=DB.nodes.filter(n=>childrenOf(n.id).some(ch=>childrenOf(ch.id).length>0));return c.length?c:DB.nodes.filter(n=>!n.parentId);}
-function progressData(parentId){
+/* ノード配下の最新動画バージョン（{v,node,t}／なければnull） */
+function latestVideoVersionUnder(nodeId){let best=null;for(const n of [getNode(nodeId),...descendants(nodeId)])if(n)for(const v of (n.versions||[]))if(v.type==='video'){const t=v.uploadedAt||'';if(!best||t>best.t)best={v,node:n,t}}return best;}
+/* tab: 'stage'（工程別）| 'status'（ステータス別）。各ショットに key（分類）を付与 */
+function progressData(parentId,tab){
   const parent=getNode(parentId);
   const shots=childrenOf(parentId);
-  const counts={};const perShot=[];
-  for(const shot of shots){
-    const cur=shotCurrentStage(shot);
-    perShot.push({shot,stage:cur});
-    counts[cur||'__none__']=(counts[cur||'__none__']||0)+1;
+  const statuses=projStatuses(parent||shots[0]||{});
+  const perShot=shots.map(shot=>{
+    const stages=childrenOf(shot.id).map(st=>({node:st,time:latestVideoTimeUnder(st.id)}));
+    const withVid=stages.filter(s=>s.time).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
+    const curNode=withVid.length?withVid[withVid.length-1].node:null;
+    return {shot,stageName:curNode?curNode.name:null,curNode,
+            statusId:curNode?nodeStatus(curNode):'empty',
+            latest:latestVideoVersionUnder(shot.id),stageCount:childrenOf(shot.id).length};
+  });
+  let rows;
+  if(tab==='status'){
+    const buckets=statuses.map(s=>({id:s.id,label:s.label,color:s.color,count:0}));
+    const byId=Object.fromEntries(buckets.map(b=>[b.id,b]));
+    const emptyB={id:'empty',label:'未着手',color:'#5a5a6a',count:0};
+    for(const ps of perShot){const id=(byId[ps.statusId]?ps.statusId:'empty');ps.key=id;(id==='empty'?emptyB:byId[id]).count++}
+    rows=buckets.concat(emptyB.count?[emptyB]:[]);
+  }else{
+    const stageNames=[...new Set(shots.flatMap(s=>childrenOf(s.id).map(c=>c.name)))].sort(stageRankCmp);
+    const counts={};for(const ps of perShot){ps.key=ps.stageName||'__none__';counts[ps.key]=(counts[ps.key]||0)+1}
+    rows=stageNames.map(nm=>({id:nm,label:nm,color:stageColor(nm),count:counts[nm]||0}));
+    if(counts['__none__'])rows.push({id:'__none__',label:'未着手',color:'#5a5a6a',count:counts['__none__']});
   }
-  /* 全ショットで検出された工程名の集合（現在工程でなくても列挙） */
-  const stageNames=[...new Set(shots.flatMap(s=>childrenOf(s.id).map(c=>c.name)))].sort(stageRankCmp);
-  const rows=stageNames.map(nm=>({id:nm,label:nm,color:stageColor(nm),count:counts[nm]||0}));
-  const none=counts['__none__']||0;
-  if(none)rows.push({id:'__none__',label:'未着手',color:'#5a5a6a',count:none});
-  return {parent,total:shots.length,rows,perShot};
+  return {parent,total:shots.length,rows,perShot,tab};
 }
-function drawDonut(cv,rows,total){
+function drawDonut(cv,rows,total,onPick){
   const c=cv.getContext('2d');const W=cv.width,H=cv.height;c.clearRect(0,0,W,H);
-  const cx=W/2,cy=H/2,rO=Math.min(W,H)/2-6,rI=rO*0.6;
-  if(!total){c.strokeStyle='#2a2a2f';c.lineWidth=rO-rI;c.beginPath();c.arc(cx,cy,(rO+rI)/2,0,Math.PI*2);c.stroke();return}
-  let a=-Math.PI/2;
+  const cx=W/2,cy=H/2,rO=Math.min(W,H)/2-6,rI=rO*0.6,START=-Math.PI/2;
+  const segs=[];
+  if(!total){c.strokeStyle='#2a2a2f';c.lineWidth=rO-rI;c.beginPath();c.arc(cx,cy,(rO+rI)/2,0,Math.PI*2);c.stroke();cv.onclick=null;cv.style.cursor='default';return}
+  let a=START;
   for(const r of rows){
     if(!r.count)continue;
     const frac=r.count/total;const a2=a+frac*Math.PI*2;
     c.beginPath();c.moveTo(cx,cy);c.arc(cx,cy,rO,a,a2);c.closePath();c.fillStyle=r.color;c.fill();
-    a=a2;
+    segs.push({row:r,a1:a,a2});a=a2;
   }
   /* 中央くり抜き */
   c.beginPath();c.arc(cx,cy,rI,0,Math.PI*2);c.fillStyle='#141416';c.fill();
   c.fillStyle='#e8e8ec';c.textAlign='center';c.font='700 26px system-ui,sans-serif';
   c.fillText(String(total),cx,cy-2);
+  if(onPick){
+    cv.style.cursor='pointer';
+    cv.onclick=e=>{const r=cv.getBoundingClientRect();const x=e.clientX-r.left-cx,y=e.clientY-r.top-cy;const dist=Math.hypot(x,y);if(dist<rI||dist>rO)return;let ca=Math.atan2(y,x);while(ca<START)ca+=Math.PI*2;while(ca>=START+Math.PI*2)ca-=Math.PI*2;for(const s of segs)if(ca>=s.a1&&ca<s.a2){onPick(s.row);return}};
+  }else{cv.onclick=null;cv.style.cursor='default'}
   c.fillStyle='#8a8a9a';c.font='11px system-ui,sans-serif';c.fillText('ショット',cx,cy+16);
 }
 function openProgress(){
@@ -1602,6 +1621,20 @@ function openProgress(){
   +'.stbl td{padding:7px 8px;border-bottom:1px solid #1f1f24;vertical-align:middle}'
   +'.stbl tr:hover td{background:#17171b}'
   +'.stbl .sn{font-weight:600}.stbl .sp2{color:#5a5a6a;font-size:11px}'
+  +'.tabs{display:flex;gap:6px}'
+  +'.tab{background:#1c1c1f;border:1px solid #2a2a2f;color:#9a9aaa;border-radius:7px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer}'
+  +'.tab:hover{color:#e8e8ec}'
+  +'.tab.on{background:rgba(96,165,255,.16);border-color:rgba(96,165,255,.6);color:#e8e8ec}'
+  +'.ptbl .trow{cursor:pointer}.ptbl .trow:hover td{background:#17171b}.ptbl .trow.pick td{background:rgba(96,165,255,.12)}'
+  +'.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}'
+  +'.tile{border:1px solid #2a2a2f;border-radius:8px;overflow:hidden;cursor:pointer;background:#1c1c1f}'
+  +'.tile:hover{border-color:rgba(96,165,255,.7);box-shadow:0 0 10px rgba(96,165,255,.22)}'
+  +'.tile .th{aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#5a5a6a;font-size:22px}'
+  +'.tile .bd{padding:7px 9px}.tile .nm{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  +'.tile .mt{display:flex;align-items:center;gap:6px;margin-top:4px}.tile .pth{font-size:10px;color:#5a5a6a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+  +'.mod{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;flex-direction:column;z-index:50}.mod.on{display:flex}'
+  +'.mod .mtop{display:flex;align-items:center;gap:10px;padding:10px 16px}.mod .mnm{font-weight:700}.mod .mpth{color:#8a8a9a;font-size:11px}.mod .msp{flex:1}'
+  +'.mod .mbody{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 16px 16px}.mod video{max-width:100%;max-height:100%}'
   +'.empty{color:#5a5a6a;padding:50px;text-align:center}';
   d.head.appendChild(st);
   const ce2=(t,c,x)=>{const e=d.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -1612,9 +1645,27 @@ function openProgress(){
   const rf=ce2('button','btn','↻ 更新');hd.appendChild(rf);
   d.body.appendChild(hd);
   const wrap=ce2('div','wrap');d.body.appendChild(wrap);
-  Object.assign(pgUI,{ce2,wrap});
+  /* プレビュー用モーダル（タイルクリックで最新動画を再生） */
+  const mod=ce2('div','mod');const mtop=ce2('div','mtop');
+  const mnm=ce2('span','mnm','—');const mpth=ce2('span','mpth','');const msp=ce2('div','msp');
+  const mclose=ce2('button','btn','✕ 閉じる');
+  mtop.appendChild(mnm);mtop.appendChild(mpth);mtop.appendChild(msp);mtop.appendChild(mclose);
+  const mbody=ce2('div','mbody');const mvideo=ce2('video');mvideo.controls=true;mvideo.playsInline=true;mbody.appendChild(mvideo);
+  mod.appendChild(mtop);mod.appendChild(mbody);d.body.appendChild(mod);
+  const closeMod=()=>{mod.classList.remove('on');mvideo.pause();mvideo.removeAttribute('src');mvideo.load()};
+  mclose.onclick=closeMod;mod.onclick=e=>{if(e.target===mod)closeMod()};
+  d.addEventListener('keydown',e=>{if(e.key==='Escape')closeMod()});
+  Object.assign(pgUI,{ce2,wrap,mod,mnm,mpth,mvideo});
   rf.onclick=()=>pgBuild();
   pgBuild();
+}
+async function pgPreview(shot,ver){
+  const {mod,mnm,mpth,mvideo}=pgUI;
+  mnm.textContent=shot.name+(ver?'　'+ver.name:'');
+  mpth.textContent=pathOf(shot.id).slice(0,-1).map(x=>x.name).join(' / ')||'—';
+  mod.classList.add('on');
+  const url=ver?await storage.getURL(ver.file):null;
+  if(url){mvideo.src=url;mvideo.play().catch(()=>{})}
 }
 function pgBuild(){
   if(!pgWin||pgWin.closed)return;
@@ -1622,57 +1673,93 @@ function pgBuild(){
   const cands=shotParentCandidates();
   if(!cands.length){wrap.appendChild(ce2('div','empty','フォルダがありません。ショット→工程の階層を作成してください。'));return}
   if(!pgUI.parentId||!cands.some(c=>c.id===pgUI.parentId))pgUI.parentId=cands[0].id;
+  if(pgUI.tab!=='status')pgUI.tab='stage';
   /* ショット親セレクタ */
   const selrow=ce2('div','selrow');
   selrow.appendChild(ce2('label',null,'ショット親フォルダ'));
   const sel=ce2('select');
   for(const c of cands){const o=ce2('option',null,pathOf(c.id).map(x=>x.name).join(' / '));o.value=c.id;if(c.id===pgUI.parentId)o.selected=true;sel.appendChild(o)}
-  sel.onchange=()=>{pgUI.parentId=sel.value;pgBuild()};
+  sel.onchange=()=>{pgUI.parentId=sel.value;pgUI.pick=null;pgBuild()};
   selrow.appendChild(sel);
   wrap.appendChild(selrow);
-  const p=progressData(pgUI.parentId);
+  /* タブ（工程グラフ / ステータスグラフ） */
+  const tabs=ce2('div','tabs');
+  const mkTab=(id,lab)=>{const t=ce2('button','tab'+(pgUI.tab===id?' on':''),lab);t.onclick=()=>{if(pgUI.tab!==id){pgUI.tab=id;pgUI.pick=null;pgBuild()}};tabs.appendChild(t)};
+  mkTab('stage','工程グラフ');mkTab('status','ステータスグラフ');
+  wrap.appendChild(tabs);
+  const p=progressData(pgUI.parentId,pgUI.tab);
   selrow.appendChild(ce2('span','cnt','ショット '+p.total+' 件'));
   if(!p.total){wrap.appendChild(ce2('div','empty','このフォルダ直下にショットがありません。'));return}
-  /* 工程別 集計（円グラフ＋表） */
+  const isStage=pgUI.tab==='stage';
+  /* 集計（円グラフ＋表） */
   const card=ce2('div','pcard');
   const ph=ce2('div','ph');
   ph.appendChild(ce2('span','pn',p.parent?p.parent.name:'—'));
-  ph.appendChild(ce2('span','pc','ショット '+p.total+' 件 / 工程で色分け'));
+  ph.appendChild(ce2('span','pc','ショット '+p.total+' 件 / '+(isStage?'工程':'ステータス')+'で色分け・クリックで絞り込み'));
   card.appendChild(ph);
   const body=ce2('div','pbody');
   const cv=ce2('canvas');cv.width=180;cv.height=180;body.appendChild(cv);
-  drawDonut(cv,p.rows,p.total);
+  const pick=row=>{pgUI.pick=(pgUI.pick===row.id?null:row.id);pgBuild()};
+  drawDonut(cv,p.rows,p.total,pick);
   const tbl=ce2('table','ptbl');
-  const thead=ce2('tr');['工程','ショット数','割合','進捗'].forEach(h=>thead.appendChild(ce2('th',null,h)));
+  const thead=ce2('tr');[(isStage?'工程':'ステータス'),'ショット数','割合','進捗'].forEach(h=>thead.appendChild(ce2('th',null,h)));
   tbl.appendChild(thead);
   for(const r of p.rows){
-    const tr=ce2('tr','trow'+(r.id==='__none__'?' done':''));
+    const tr=ce2('tr','trow'+(r.id==='empty'||r.id==='__none__'?' done':'')+(pgUI.pick===r.id?' pick':''));
     const c1=ce2('td');const sw=ce2('span','sw');sw.style.background=r.color;c1.appendChild(sw);c1.appendChild(ce2('span',null,r.label));tr.appendChild(c1);
     tr.appendChild(ce2('td','num',String(r.count)));
     const pct=p.total?Math.round(r.count/p.total*100):0;
     tr.appendChild(ce2('td','pct',pct+'%'));
     const c4=ce2('td');const bar=ce2('div','bar');const fill=ce2('i');fill.style.width=pct+'%';fill.style.background=r.color;bar.appendChild(fill);c4.appendChild(bar);tr.appendChild(c4);
+    tr.onclick=()=>pick(r);
     tbl.appendChild(tr);
   }
   body.appendChild(tbl);
   card.appendChild(body);
   wrap.appendChild(card);
-  /* ショット別 現在工程の一覧 */
-  wrap.appendChild(ce2('div','sect-h','ショット別 現在の工程'));
-  const st=ce2('table','stbl');
-  const sth=ce2('tr');['ショット','現在の工程','工程数'].forEach(h=>sth.appendChild(ce2('th',null,h)));
-  st.appendChild(sth);
-  for(const {shot,stage} of p.perShot){
-    const tr=ce2('tr');
-    const c1=ce2('td');c1.appendChild(ce2('span','sn',shot.name));c1.appendChild(ce2('div','sp2',pathOf(shot.id).slice(0,-1).map(x=>x.name).join(' / ')||'—'));tr.appendChild(c1);
-    const c2=ce2('td');
-    if(stage){const b=ce2('span','badge2',stage);b.style.background=stageColor(stage);c2.appendChild(b)}
-    else c2.appendChild(ce2('span','sp2','未着手'));
-    tr.appendChild(c2);
-    tr.appendChild(ce2('td','num',String(childrenOf(shot.id).length)));
-    st.appendChild(tr);
+  /* 選択中のセグメント → 該当ショットをグリッド表示 */
+  if(pgUI.pick!=null){
+    const row=p.rows.find(r=>r.id===pgUI.pick);
+    const hits=p.perShot.filter(ps=>ps.key===pgUI.pick);
+    wrap.appendChild(ce2('div','sect-h','「'+(row?row.label:'')+'」のショット（'+hits.length+' 件）'));
+    const grid=ce2('div','grid');
+    for(const ps of hits){
+      const tile=ce2('div','tile');
+      const th=ce2('div','th','🎬');
+      const lv=ps.latest;
+      if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u){th.textContent='';th.style.backgroundImage='url("'+u+'")'}});
+      tile.appendChild(th);
+      const bd=ce2('div','bd');
+      bd.appendChild(ce2('div','nm',ps.shot.name));
+      const mt=ce2('div','mt');
+      const badge=ce2('span','badge2',isStage?(ps.stageName||'未着手'):(stInfo(ps.curNode||ps.shot).label));
+      badge.style.background=isStage?stageColor(ps.stageName):(stInfo(ps.curNode||ps.shot).color||'#5a5a6a');
+      mt.appendChild(badge);
+      mt.appendChild(ce2('span','pth',lv?('最新: '+lv.v.name):'動画なし'));
+      bd.appendChild(mt);
+      tile.appendChild(bd);
+      tile.onclick=()=>{if(lv)pgPreview(ps.shot,lv.v);else toast('このショットには動画がありません')};
+      grid.appendChild(tile);
+    }
+    wrap.appendChild(grid);
+  }else{
+    /* 未選択時はショット別 現在工程/ステータスの一覧 */
+    wrap.appendChild(ce2('div','sect-h','ショット別 現在の'+(isStage?'工程':'ステータス')));
+    const st=ce2('table','stbl');
+    const sth=ce2('tr');['ショット',(isStage?'現在の工程':'ステータス'),'工程数'].forEach(h=>sth.appendChild(ce2('th',null,h)));
+    st.appendChild(sth);
+    for(const ps of p.perShot){
+      const tr=ce2('tr');
+      const c1=ce2('td');c1.appendChild(ce2('span','sn',ps.shot.name));c1.appendChild(ce2('div','sp2',pathOf(ps.shot.id).slice(0,-1).map(x=>x.name).join(' / ')||'—'));tr.appendChild(c1);
+      const c2=ce2('td');
+      if(isStage){if(ps.stageName){const b=ce2('span','badge2',ps.stageName);b.style.background=stageColor(ps.stageName);c2.appendChild(b)}else c2.appendChild(ce2('span','sp2','未着手'))}
+      else{const si=stInfo(ps.curNode||ps.shot);if(ps.curNode){const b=ce2('span','badge2',si.label);b.style.background=si.color;c2.appendChild(b)}else c2.appendChild(ce2('span','sp2','未着手'))}
+      tr.appendChild(c2);
+      tr.appendChild(ce2('td','num',String(ps.stageCount)));
+      st.appendChild(tr);
+    }
+    wrap.appendChild(st);
   }
-  wrap.appendChild(st);
 }
 
 /* ============================================================
