@@ -827,11 +827,13 @@ function renderMainHead(){
 function rootOf(node){let n=node;while(n&&n.parentId){const p=getNode(n.parentId);if(!p)break;n=p}return n;}
 /* プロジェクトの上部タブ（常に表示）。タブクリックでプロジェクトのトップ＋該当タブへ */
 function buildProjectTabs(root){
-  if(!['timeline','progress','shots'].includes(state.projTab))state.projTab='timeline';
+  if(!['timeline','progress','shots','browse'].includes(state.projTab))state.projTab='timeline';
+  /* 現在サブページ（root以外）にいるときは「階層」タブをアクティブ扱いにする */
   const onRoot=state.currentId===root.id&&!state.search.trim();
   const nav=el('div','ptab-nav');
-  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット']]){
-    const b=el('button','ptab'+(onRoot&&state.projTab===id?' on':''),lab);
+  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['browse','階層']]){
+    const active=onRoot?state.projTab===id:(id==='browse');
+    const b=el('button','ptab'+(active?' on':''),lab);
     b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);render()};
     nav.appendChild(b);
   }
@@ -848,9 +850,11 @@ function renderBody(){
     const main=el('div','home-main');s.appendChild(main);
     if(state.projTab==='progress')renderProjProgress(main,root);
     else if(state.projTab==='shots')renderProjShots(main,root);
+    else if(state.projTab==='browse')renderSectionBody(main,root);
     else renderProjTimeline(main,root);
     return;
   }
+  /* サブページ（セクション/レビュー）— 上部タブは「階層」がアクティブ表示 */
   if(cur.type==='review')renderReviewBody(s,cur);
   else renderSectionBody(s,cur);
 }
