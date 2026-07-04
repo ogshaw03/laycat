@@ -61,6 +61,8 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .sidebar{width:250px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding:12px 8px}
 .sidebar-label{font-size:10px;font-weight:500;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;padding:0 8px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
 .sidebar-label .add{color:var(--accent);cursor:pointer;font-size:14px}
+.sidebar-label .side-ctrls{display:flex;align-items:center;gap:11px}
+.sidebar-label .side-ctrls .add:hover{color:var(--text)}
 /* TREE */
 .tree{font-size:13px}
 .tree-row{display:flex;align-items:center;gap:5px;padding:5px 6px;border-radius:6px;color:var(--text2);cursor:pointer;white-space:nowrap;overflow:hidden}
@@ -738,7 +740,10 @@ function renderSidebar(){
   /* プロジェクトフォルダ（ルート）は出さず、現在のプロジェクト配下の階層のみ表示 */
   const root=rootOf(getNode(state.currentId));
   const lab=el('div','sidebar-label');lab.appendChild(el('span',null,'ショット / 工程'));
-  const add=el('span','add','＋');add.title='この直下に項目を追加';add.onclick=()=>openAddModal(root.id);lab.appendChild(add);sb.appendChild(lab);
+  const ctrls=el('span','side-ctrls');
+  const col=el('span','add','⊟');col.title='現在の階層以外を閉じる';col.onclick=()=>{state.expanded=new Set(pathOf(state.currentId).map(n=>n.id));renderSidebar()};ctrls.appendChild(col);
+  const add=el('span','add','＋');add.title='この直下に項目を追加';add.onclick=()=>openAddModal(root.id);ctrls.appendChild(add);
+  lab.appendChild(ctrls);sb.appendChild(lab);
   const kids=childrenOf(root.id);
   if(!kids.length){sb.appendChild(el('div','tree-empty','項目なし'));return}
   const tree=el('div','tree');
