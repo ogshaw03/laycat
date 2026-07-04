@@ -289,15 +289,16 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 
 /* FB画面（シンクスケッチ風） */
 /* サブミットブロック */
-.sub-overlay{position:fixed;inset:0;background:#0d0d0f;z-index:1400;display:flex;flex-direction:column}
-.sub-top{display:flex;align-items:center;gap:12px;padding:11px 16px;background:var(--bg2);border-bottom:1px solid var(--edge);box-shadow:0 1px 10px var(--edgeglow);flex-shrink:0}
-.sub-top .logo{font-family:var(--font-head);font-weight:700;font-size:16px}
+.sub-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1400;display:flex;align-items:center;justify-content:center;padding:24px}
+.sub-modal{background:var(--bg);width:min(1080px,96vw);max-height:90vh;display:flex;flex-direction:column;border:1px solid var(--edge);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden}
+.sub-top{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.sub-top .logo{font-family:var(--font-head);font-weight:700;font-size:15px}
 .sub-top .sub{color:var(--text3);font-size:11px}.sub-top .sp{flex:1}
-.sub-body{flex:1;min-height:0;overflow-y:auto;padding:20px 24px}
-.sub-wrap{max-width:1080px;margin:0 auto}
+.sub-body{flex:1;min-height:0;overflow-y:auto;padding:18px 20px}
+.sub-wrap{max-width:100%;margin:0 auto}
 .subl-item{display:flex;align-items:center;gap:14px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);padding:14px 16px;margin-bottom:12px;cursor:pointer}
 .subl-item:hover{border-color:var(--edge);box-shadow:0 0 10px var(--edgeglow)}
-.subl-item .nm{font-family:var(--font-head);font-weight:700;font-size:16px}
+.subl-item .nm{font-family:var(--font-body);font-weight:700;font-size:16px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
 .subl-item .mt{color:var(--text3);font-size:12px}
 .subl-item .thumbs{display:flex;gap:5px;margin-left:auto}
 .subl-item .thumbs .th{width:60px;height:34px;border-radius:4px;background:#000 center/cover no-repeat;border:1px solid var(--border)}
@@ -305,7 +306,9 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .sub-block .bh{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)}
 .sub-block .bh .st{display:inline-block;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;color:#101013}
 .sub-block .bh .sn{font-weight:600}.sub-block .bh .sp2{color:var(--text3);font-size:11px}
-.sub-block .bh .rm{margin-left:auto;background:none;border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:12px}
+.sub-block .bh .sub-st{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3)}
+.sub-block .bh .sub-st select{background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:3px 8px;font-size:12px;font-family:inherit;cursor:pointer}
+.sub-block .bh .rm{background:none;border:1px solid var(--border);color:var(--text3);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:12px}
 .sub-block .bbody{display:flex;gap:16px;padding:14px}
 .sub-drop{width:280px;flex-shrink:0;aspect-ratio:16/9;border:2px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;cursor:pointer;background:#000 center/cover no-repeat;position:relative;overflow:hidden;text-align:center}
 .sub-drop.drag{border-color:var(--edge);color:var(--text);background-color:rgba(96,165,255,.08)}
@@ -316,7 +319,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .sub-cmt label{font-size:11px;color:var(--text3)}
 .sub-cmt textarea{flex:1;min-height:110px;resize:vertical;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px;font-family:inherit}
 .sub-empty{color:var(--text3);text-align:center;padding:60px 10px}
-.sub-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 24px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
+.sub-foot{display:flex;justify-content:flex-end;gap:10px;padding:12px 20px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
 /* サブミット：ショットピッカー */
 .subpick{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:1450;display:flex;flex-direction:column}
 .subpick .pk{background:var(--bg2);margin:auto;width:min(960px,94vw);max-height:88vh;display:flex;flex-direction:column;border:1px solid var(--edge);border-radius:12px;box-shadow:0 12px 50px rgba(0,0,0,.6)}
@@ -331,6 +334,23 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .pk-stages{display:flex;flex-wrap:wrap;gap:6px;padding:0 9px 10px}
 .pk-chip{border:1px solid var(--border2);color:var(--text2);border-radius:14px;padding:3px 11px;font-size:12px;cursor:pointer}
 .pk-chip.on{background:rgba(96,165,255,.18);border-color:var(--edge);color:var(--text)}
+/* サブミットブロック全体コメント */
+.sub-blockcmt{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.sub-blockcmt label{font-size:11px;color:var(--text3)}
+.sub-blockcmt textarea{min-height:70px;resize:vertical;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);padding:10px;font-size:13px;font-family:inherit;line-height:1.6}
+.sub-viewcmt{border:1px solid var(--border);border-left:3px solid var(--edge);border-radius:8px;background:var(--bg2);padding:11px 14px;margin-bottom:16px}
+.sub-viewcmt .ttl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);margin-bottom:5px}
+.sub-viewcmt .tx{font-size:13px;line-height:1.65;white-space:pre-wrap}
+.submit-chip{background:rgba(96,165,255,.16)!important;color:var(--text)!important;border:1px solid var(--edge)}
+/* タイムライン：サブミットブロックのまとめ表示 */
+.tl-item.tl-submit{border-left:3px solid var(--edge)}
+.tl-subthumbs{display:grid;grid-template-columns:1fr 1fr;gap:2px;width:96px;height:54px;flex-shrink:0;border-radius:6px;overflow:hidden;background:var(--bg3)}
+.tl-subthumbs img{width:100%;height:100%;object-fit:cover;background:#000}
+.tl-subbadge{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.tl-subbadge svg{width:13px;height:13px}
+.tl-subname{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.tl-subcount{color:var(--text3);font-size:12px;margin-left:8px}
+.tl-substages{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 2px}
 .fb-overlay{position:fixed;inset:0;background:#0a0a0c;z-index:1500;display:flex;flex-direction:column}
 .fb-top{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .fb-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -781,13 +801,18 @@ function initSizeBtns(){const wrap=$('#sizeBtns');wrap.innerHTML='';let cols=4;t
 const subS={};
 function submitStagesOf(shot){const kids=childrenOf(shot.id).filter(n=>n.type==='review');return kids.length?kids:[shot];}
 function subGenName(pid){const d=new Date();const ymd=''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');let seq=1,name;do{name=ymd+'_'+String(seq).padStart(3,'0');seq++}while(DB.submits.some(s=>s.projectId===pid&&s.name===name));return name;}
-function openSubmit(){
-  const cur=state.currentId?getNode(state.currentId):null;
-  const root=cur?rootOf(cur):null;
-  if(!root){toast('プロジェクトを開いてから起動してください');return}
+function openSubmit(){const root=subBuildModal();if(root)subShowList();}
+/* タイムラインのまとめエントリなどからサブミットブロック詳細を直接開く */
+function openSubmitView(sb){const root=subBuildModal(sb.projectId);if(root)subShowView(sb);}
+function subBuildModal(forceProjId){
+  let root;
+  if(forceProjId){root=getNode(forceProjId);}
+  else{const cur=state.currentId?getNode(state.currentId):null;root=cur?rootOf(cur):null;}
+  if(!root){toast('プロジェクトを開いてから起動してください');return null}
   const old=$('#submitOverlay');if(old)old.remove();
-  subS.projectId=root.id;subS.blocks=[];
+  subS.projectId=root.id;subS.blocks=[];subS.blockComment='';
   const ov=el('div','sub-overlay');ov.id='submitOverlay';
+  const modal=el('div','sub-modal');
   const top=el('div','sub-top');
   top.appendChild(elIco('div','logo','folder','サブミットブロック'));
   top.appendChild(el('span','sub',root.name));
@@ -796,10 +821,12 @@ function openSubmit(){
   const close=el('button','btn btn-ghost btn-sm','✕ 閉じる');close.onclick=()=>ov.remove();top.appendChild(close);
   const body=el('div','sub-body');const wrap=el('div','sub-wrap');body.appendChild(wrap);
   const footHost=el('div');
-  ov.appendChild(top);ov.appendChild(body);ov.appendChild(footHost);
+  modal.appendChild(top);modal.appendChild(body);modal.appendChild(footHost);
+  ov.appendChild(modal);
+  ov.onclick=e=>{if(e.target===ov)ov.remove()};
   document.body.appendChild(ov);
-  Object.assign(subS,{ov,tr,wrap,footHost});
-  subShowList();
+  Object.assign(subS,{ov,modal,tr,wrap,footHost});
+  return root;
 }
 function subShowList(){
   const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
@@ -822,6 +849,12 @@ function subShowCreate(){
   const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
   const back=el('button','btn btn-ghost btn-sm','← 一覧');back.onclick=()=>subShowList();tr.appendChild(back);
   const addSub=el('button','btn btn-primary btn-sm','＋ サブミットの作成');addSub.onclick=()=>openSubPicker();tr.appendChild(addSub);
+  /* サブミットブロック全体へのコメント（各ショットのコメントとは別・提出メッセージ） */
+  const bc=el('div','sub-blockcmt');
+  bc.appendChild(el('label',null,'サブミットブロックへのコメント（提出メッセージ・各ショットのコメントとは別）'));
+  const bcta=el('textarea');bcta.placeholder='例）sh001とsh002を修正いたしましたのでご確認のほどよろしくお願いいたします。';
+  bcta.value=subS.blockComment||'';bcta.oninput=()=>subS.blockComment=bcta.value;bc.appendChild(bcta);
+  wrap.appendChild(bc);
   wrap.appendChild(el('div','section-label','サブミット（提出する動画）'));
   if(!subS.blocks.length){wrap.appendChild(el('div','sub-empty','右上の「＋ サブミットの作成」からショットと工程を選択してください。'));}
   else{for(const b of subS.blocks)wrap.appendChild(subBlockEl(b));}
@@ -836,6 +869,12 @@ function subBlockEl(block){
   const st=el('span','st',block.node.name);st.style.background=stageColor(block.node.name);bh.appendChild(st);
   bh.appendChild(el('span','sn',shot&&shot.id!==subS.projectId?shot.name:block.node.name));
   bh.appendChild(el('span','sp2',pathOf(block.node.id).slice(1,-1).map(x=>x.name).join(' / ')));
+  /* このショット工程のステータスを変更（作成時に反映） */
+  const stWrap=el('label','sub-st');stWrap.appendChild(el('span',null,'ステータス'));
+  const sel=el('select');
+  for(const s of projStatuses(block.node)){const o=el('option',null,s.label);o.value=s.id;if((block.status||nodeStatus(block.node))===s.id)o.selected=true;sel.appendChild(o)}
+  if(block.status===undefined)block.status=nodeStatus(block.node);
+  sel.value=block.status||'';sel.onchange=()=>block.status=sel.value;stWrap.appendChild(sel);bh.appendChild(stWrap);
   const rm=el('button','rm','削除');rm.onclick=()=>{const i=subS.blocks.indexOf(block);if(i>=0)subS.blocks.splice(i,1);subShowCreate()};bh.appendChild(rm);
   bl.appendChild(bh);
   const bbody=el('div','bbody');
@@ -893,6 +932,8 @@ async function createSubmitBlock(){
   const blocks=subS.blocks.filter(b=>b.file);
   if(!blocks.length){toast('少なくとも1つのブロックに動画を追加してください');return}
   const pid=subS.projectId;const name=subGenName(pid);
+  const subId=newId('sub');
+  const blockComment=(subS.blockComment||'').trim();
   const stub={prog:{classList:{add(){},remove(){}}},bi:{style:{}},pct:{}};
   const items=[];
   toast('サブミットブロックを作成中…');
@@ -900,12 +941,19 @@ async function createSubmitBlock(){
     const before=b.node.versions.length;
     await uploadVersion(b.node,b.file,stub,{comment:b.comment,sub:'submitblock/'+name,projectId:pid});
     const v=b.node.versions[b.node.versions.length-1];
-    if(v&&b.node.versions.length>before)items.push({nodeId:b.node.id,versionId:v.id,comment:b.comment||''});
+    if(v&&b.node.versions.length>before){
+      v.submitId=subId;v.submitName=name; /* タイムラインでまとめて表示するため */
+      /* サブミットブロックへのコメントを各ショットのレビューページにも反映（ショット個別コメントとは別扱い） */
+      if(blockComment)v.review.notes.push({author:currentUser(),text:blockComment,time:nowIso(),kind:'submit',submitName:name});
+      items.push({nodeId:b.node.id,versionId:v.id,comment:b.comment||''});
+      /* このショット工程のステータスを反映 */
+      if(b.status)b.node.status=b.status;
+    }
   }
-  DB.submits.push({id:newId('sub'),projectId:pid,name,createdAt:nowIso(),items});
+  DB.submits.push({id:subId,projectId:pid,name,createdAt:nowIso(),comment:blockComment,items});
   await persist();
   for(const b of blocks){if(b.thumbUrl){try{URL.revokeObjectURL(b.thumbUrl)}catch(_){}}}
-  subS.blocks=[];
+  subS.blocks=[];subS.blockComment='';
   toast('サブミットブロック '+name+' を作成しました（'+items.length+'件）');
   try{render();resolveThumbs()}catch(_){}
   subShowList();
@@ -913,7 +961,12 @@ async function createSubmitBlock(){
 function subShowView(sb){
   const {tr,wrap,footHost}=subS;tr.innerHTML='';wrap.innerHTML='';footHost.innerHTML='';
   const back=el('button','btn btn-ghost btn-sm','← 一覧');back.onclick=()=>subShowList();tr.appendChild(back);
+  /* このサブミットブロックの動画をまとめて REEL に送る */
+  const toReel=el('button','btn btn-primary btn-sm','▶ まとめて REEL に送る');
+  toReel.onclick=()=>subSendToReel(sb);tr.appendChild(toReel);
   wrap.appendChild(el('div','section-label',sb.name+' — タイルをクリックしてレビュー（該当ショットに反映）'));
+  /* サブミットブロックへのコメント（提出メッセージ） */
+  if(sb.comment){const bc=el('div','sub-viewcmt');bc.appendChild(elIco('div','ttl','folder','サブミットブロックへのコメント'));bc.appendChild(el('div','tx',sb.comment));wrap.appendChild(bc);}
   const grid=el('div','pm-grid');
   for(const item of (sb.items||[])){
     const n=getNode(item.nodeId);if(!n)continue;const v=n.versions.find(x=>x.id===item.versionId);if(!v)continue;
@@ -931,6 +984,15 @@ function subShowView(sb){
   }
   if(!(sb.items&&sb.items.length))wrap.appendChild(el('div','sub-empty','項目がありません。'));
   else wrap.appendChild(grid);
+}
+/* サブミットブロック内の全動画をまとめて REEL に送る */
+async function subSendToReel(sb){
+  const list=[];
+  for(const item of (sb.items||[])){const n=getNode(item.nodeId);const v=n&&n.versions.find(x=>x.id===item.versionId);if(n&&v&&v.type==='video')list.push({n,v})}
+  if(!list.length){toast('送れる動画がありません');return}
+  openReel();if(!reelAlive()){return}
+  for(const {n,v} of list)await reelAddClip(n,v);
+  toast('REEL に送りました: '+sb.name+'（'+list.length+'件）');
 }
 
 /* ============================================================
@@ -1097,13 +1159,24 @@ function renderBody(){
 /* プロジェクト（ルート）配下の更新イベント（動画アップロードのみ）を新着順で。
    コメント追加やステータス変更はタイムラインに出さない */
 function projectUpdates(rootId){
-  const evs=[];
+  const evs=[];const groups={};
   for(const n of descendants(rootId))if(n.type==='review')for(const v of (n.versions||[])){
     if(v.type!=='video')continue;
     const notes=(v.review&&v.review.notes)||[];
     const upNote=notes.find(x=>x.kind==='upload');
-    evs.push({type:'upload',node:n,v,time:v.uploadedAt||'',stage:n.name,comment:upNote?upNote.text:null});
+    const item={type:'upload',node:n,v,time:v.uploadedAt||'',stage:n.name,comment:upNote?upNote.text:null};
+    if(v.submitId){
+      /* サブミットブロックの提出はまとめて1つのタイムラインエントリに */
+      let g=groups[v.submitId];
+      if(!g){g={type:'submit',submitId:v.submitId,name:v.submitName||'サブミットブロック',items:[],time:''};groups[v.submitId]=g;evs.push(g)}
+      g.items.push(item);
+      if(item.time>g.time)g.time=item.time;
+      continue;
+    }
+    evs.push(item);
   }
+  /* まとめエントリの工程一覧（フィルタ用）：含まれる工程のどれかが表示対象なら表示 */
+  for(const g of Object.values(groups))g.stages=[...new Set(g.items.map(i=>i.stage))];
   evs.sort((a,b)=>a.time<b.time?1:a.time>b.time?-1:0);
   return evs;
 }
@@ -1114,7 +1187,8 @@ function tlHiddenSet(rootId){if(state.tlHiddenFor!==rootId){state.tlHiddenFor=ro
 
 function renderProjTimeline(main,cur){
   const hidden=tlHiddenSet(cur.id);
-  const evs=projectUpdates(cur.id).filter(e=>!hidden.has(e.stage));
+  const visEv=e=>e.type==='submit'?(e.stages||[]).some(s=>!hidden.has(s)):!hidden.has(e.stage);
+  const evs=projectUpdates(cur.id).filter(visEv);
   const lab=el('div','section-label');lab.appendChild(el('span',null,'最新の更新タイムライン'));main.appendChild(lab);
   if(!evs.length){
     main.appendChild(el('div','empty',projectUpdates(cur.id).length?'表示できる更新がありません。右上の工程フィルタでチェックを追加してください。':'まだ更新がありません。工程（レビュー）に動画をアップロードすると、ここに新着順で表示されます。'));
@@ -1122,6 +1196,7 @@ function renderProjTimeline(main,cur){
   }
   const tl=el('div','tl');
   for(const e of evs){
+    if(e.type==='submit'){tl.appendChild(tlSubmitItem(e,cur));continue}
     /* ショットの枠全体をクリックで該当ショットへ移動 */
     const it=el('div','tl-item');it.onclick=()=>go(e.node.id);it.title='クリックで開く';
     const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;
@@ -1142,6 +1217,27 @@ function renderProjTimeline(main,cur){
   }
   main.appendChild(tl);
 }
+/* タイムライン：サブミットブロックのまとめエントリ（クリックでサブミットブロックを開く） */
+function tlSubmitItem(e,cur){
+  const sb=(DB.submits||[]).find(s=>s.id===e.submitId);
+  const it=el('div','tl-item tl-submit');it.title='クリックでサブミットブロックを開く';
+  it.onclick=()=>{if(sb)openSubmitView(sb)};
+  const ths=el('div','tl-subthumbs');
+  for(const item of e.items.slice(0,4)){const th=el('img');if(item.v.thumb)th.dataset.ref=item.v.thumb;ths.appendChild(th)}
+  it.appendChild(ths);
+  const bd=el('div','tl-body');
+  const top=el('div','tl-path');top.appendChild(elIco('span','tl-subbadge','folder','サブミットブロック'));bd.appendChild(top);
+  const t=el('div','tl-title');
+  t.appendChild(el('span','tl-subname',e.name));
+  t.appendChild(el('span','tl-subcount',e.items.length+' 件の提出'));
+  bd.appendChild(t);
+  const stg=el('div','tl-substages');
+  for(const s of (e.stages||[])){const chip=el('span','tl-stage',s);chip.style.background=stageColor(s);stg.appendChild(chip)}
+  bd.appendChild(stg);
+  bd.appendChild(el('div','tl-meta',fmt(e.time)+' に提出'));
+  it.appendChild(bd);
+  return it;
+}
 /* ショットタブ：ショット親フォルダ直下の「ショット」ごとに最新動画をグリッド表示
    （ショットの中身＝工程ではなく、ショット単位で表示） */
 function renderProjShots(main,cur){
@@ -1160,7 +1256,8 @@ function renderProjShots(main,cur){
     mt.appendChild(el('span','pth',lv?('最新: '+(lv.node!==sh?lv.node.name+' / ':'')+lv.v.name):'動画なし'));
     bd.appendChild(mt);
     tile.appendChild(bd);
-    tile.onclick=()=>{if(lv)pmPreview(sh,lv.v);else go(sh.id)};
+    /* タイルクリックで該当動画（最新）のレビューページへ移動 */
+    tile.onclick=()=>{if(lv)go(lv.node.id);else go(sh.id)};
     grid.appendChild(tile);
   }
   main.appendChild(grid);
@@ -1463,6 +1560,7 @@ function noteBlock(v,n,opts){
     m.appendChild(fc);
   }
   if(n.drawing&&n.drawing.length)m.appendChild(el('span','frame-chip','✎ 描画'));
+  if(n.kind==='submit')m.appendChild(el('span','frame-chip submit-chip','⧉ '+(n.submitName||'サブミットブロック')));
   const acts=el('span','note-acts');
   const ed=el('button','na','✎ 編集');
   const del=el('button','na','✕');del.title='削除';
