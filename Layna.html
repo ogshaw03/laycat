@@ -641,7 +641,20 @@ async function boot(){
   for(const n of DB.nodes)if(n.type==='review'&&n.status==null&&n.versions&&n.versions.length){const lv=n.versions[n.versions.length-1];n.status=(lv.review&&lv.review.status)||'pending'}
   await persist();
   updateFolderStatus();initSizeBtns();updateNotifBadge();
-  state.currentId=null;go(null);
+  /* リロード時は前回開いていた画面を復元（無効ならホーム） */
+  let restored=false;
+  try{
+    const raw=localStorage.getItem('layna_loc');
+    if(raw){const loc=JSON.parse(raw);
+      if(loc&&loc.id&&getNode(loc.id)){
+        state.currentId=loc.id;
+        if(['timeline','progress','shots','browse'].includes(loc.tab))state.projTab=loc.tab;
+        for(const n of pathOf(loc.id))state.expanded.add(n.id);
+        render();resolveThumbs();restored=true;
+      }
+    }
+  }catch(_){}
+  if(!restored){state.currentId=null;go(null)}
 }
 function updateFolderStatus(){$('#folderStatus').classList.toggle('connected',!!storage.mode);$('#folderName').textContent=storage.folderLabel()}
 
@@ -713,7 +726,8 @@ function updateHeaderForContext(){
   setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#sizeBtns',!home);
   setD('#addBtn',true);setD('#mainHead',!home);setD('#breadcrumb',!home);
 }
-function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
+function saveLoc(){try{localStorage.setItem('layna_loc',JSON.stringify({id:state.currentId||null,tab:state.projTab||'timeline'}))}catch(_){}}
+function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();saveLoc();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
 
 /* サイドバー：ツリー */
 function renderSidebar(){
@@ -1062,7 +1076,6 @@ function renderSectionBody(s,cur){
   if(!kids.length){s.appendChild(el('div','empty','まだ項目がありません。「+ 追加」で工程（レビュー）や下位セクションを作成してください。'));return}
   const grid=el('div','grid');
   for(const n of kids)grid.appendChild(nodeCard(n,false));
-  const addTile=el('div','add-tile');addTile.innerHTML='<div class="p">＋</div><div>追加</div>';addTile.onclick=()=>openAddModal(parentId);grid.appendChild(addTile);
   s.appendChild(grid);
 }
 
