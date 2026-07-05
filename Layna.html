@@ -140,6 +140,7 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .home-hd{margin:8px 4px 30px}
 .home-hd .ht{font-family:var(--font-head);font-size:30px;font-weight:800;letter-spacing:.5px}
 .home-hd .hs{color:var(--text3);font-size:13px;margin-top:7px}
+.home-acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .proj-grid{display:grid;gap:24px;grid-template-columns:repeat(auto-fill,272px);justify-content:center}
 .proj-card{border:1px solid var(--edge);border-radius:16px;overflow:hidden;background:var(--bg);cursor:pointer;box-shadow:0 0 10px var(--edgeglow);transition:box-shadow .2s ease,border-color .2s ease}
 .proj-card:hover{animation:tile-beat 2.6s ease-in-out infinite}
@@ -579,8 +580,29 @@ const storage={
   async projRoot(projectId){if(!projectId)return null;if(this.projHandles.has(projectId))return this.projHandles.get(projectId);let h=null;try{h=await idbGet('handles','proj_'+projectId)}catch(_){}if(h){try{if(await h.queryPermission({mode:'readwrite'})!=='granted'){if(await h.requestPermission({mode:'readwrite'})!=='granted')h=null}}catch(_){h=null}}this.projHandles.set(projectId,h);return h;},
   async setProjRoot(projectId,handle){await idbPut('handles','proj_'+projectId,handle);this.projHandles.set(projectId,handle);},
   async clearProjRoot(projectId){try{await idbDel('handles','proj_'+projectId)}catch(_){}this.projHandles.set(projectId,null);},
-  async loadDb(){return (await idbGet('kv','db'))||null},
-  async saveDb(db){await idbPut('kv','db',db)},
+  /* ===== プロジェクト単位ストレージ =====
+     ・個人設定/グローバル（templates, notifications, reels）→ kv/local（このブラウザ内）
+     ・接続プロジェクト一覧（registry）→ kv/registry（このブラウザ内・ユーザーごと）
+     ・各プロジェクトのデータ（nodes, submits）→ プロジェクトフォルダ内 layna.project.json、
+       フォルダ未指定なら kv/proj_<id>（このブラウザ内） */
+  async loadLocal(){return (await idbGet('kv','local'))||null},
+  async saveLocal(obj){await idbPut('kv','local',obj)},
+  async loadRegistry(){return (await idbGet('kv','registry'))||null},
+  async saveRegistry(arr){await idbPut('kv','registry',arr)},
+  _projFileName:'layna.project.json',
+  async loadProject(id){
+    const ph=await this.projRoot(id);
+    if(ph){try{const fh=await ph.getFileHandle(this._projFileName);const t=await (await fh.getFile()).text();return JSON.parse(t)}catch(e){}}
+    return (await idbGet('kv','proj_'+id))||null;
+  },
+  async saveProject(id,data){
+    const ph=await this.projRoot(id);
+    if(ph){try{const fh=await ph.getFileHandle(this._projFileName,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(data,null,2));await w.close();return}catch(e){}}
+    await idbPut('kv','proj_'+id,data);
+  },
+  async delProject(id){try{await idbDel('kv','proj_'+id)}catch(_){}try{const ph=await this.projRoot(id);if(ph)await ph.removeEntry(this._projFileName)}catch(_){}},
+  /* 旧: 単一DB（移行用に読むだけ） */
+  async loadLegacyDb(){return (await idbGet('kv','db'))||null},
   /* opts.projectId 指定かつ設定済みならプロジェクトフォルダへ保存（ref は p:<id>|<path>）。
      未指定・未設定はブラウザ内保存（ref は idb:...）。 */
   async putMedia(sub,fn,blob,opts){
@@ -596,9 +618,43 @@ const storage={
 
 /* ---------- 状態 / DB ---------- */
 let DB=null;let curUploadUI=null;
+let REG=[]; /* 接続プロジェクト一覧（このユーザーが使うプロジェクト）: [{id,name,folderName}] */
 const state={currentId:null,search:'',expanded:new Set(),frameOrder:false};
-function defaultDb(){return{version:2,templates:defaultTemplates(),nodes:[],reels:[],notifications:[],submits:[]}}
-async function persist(){await storage.saveDb(DB)}
+function defaultDb(){return{version:3,templates:defaultTemplates(),nodes:[],reels:[],notifications:[],submits:[]}}
+/* プロジェクト（ルート）ID を求める */
+function projectIdOf(nodeId){const n=getNode(nodeId);return n?rootOf(n).id:null}
+/* あるプロジェクトに属する node/submit をまとめてプロジェクトデータ化 */
+function projectData(pid){
+  const root=getNode(pid);if(!root)return null;
+  const nodes=[root,...descendants(pid)];
+  const submits=(DB.submits||[]).filter(s=>s.projectId===pid);
+  return{v:3,id:pid,name:root.name,nodes,submits};
+}
+/* registry を最新のルート情報に同期 */
+function syncRegistryFromDb(){
+  for(const root of childrenOf(null)){
+    let e=REG.find(x=>x.id===root.id);
+    if(!e){e={id:root.id,name:root.name,folderName:root.folderName||null};REG.push(e)}
+    else{e.name=root.name;e.folderName=root.folderName||null}
+  }
+  /* DBに無くなったプロジェクトは registry から除去 */
+  REG=REG.filter(e=>getNode(e.id));
+}
+/* 変更検知用キャッシュ（未変更のファイル書き込みを省略） */
+const _saveCache={local:'',reg:'',proj:{}};
+/* 保存：グローバル(local)＋registry＋各プロジェクト（変更があったもののみ書き込み） */
+async function persist(){
+  if(!DB)return;
+  syncRegistryFromDb();
+  const local={templates:DB.templates,notifications:DB.notifications,reels:DB.reels};
+  const ls=JSON.stringify(local);if(ls!==_saveCache.local){await storage.saveLocal(local);_saveCache.local=ls}
+  const rs=JSON.stringify(REG);if(rs!==_saveCache.reg){await storage.saveRegistry(REG);_saveCache.reg=rs}
+  for(const e of REG){
+    const data=projectData(e.id);if(!data)continue;
+    const ps=JSON.stringify(data);
+    if(_saveCache.proj[e.id]!==ps){await storage.saveProject(e.id,data);_saveCache.proj[e.id]=ps}
+  }
+}
 
 /* v1(projects/shots) → v2(nodes) 移行 */
 function migrate(old){
@@ -690,35 +746,63 @@ function chrome(on){$('.header').style.display=on?'':'none';$('.app-body').style
    ============================================================ */
 async function boot(){
   const g=$('#gateScreen');if(g)g.remove();chrome(true);
-  let raw=await storage.loadDb();
-  if(!raw)DB=defaultDb();
-  else if(raw.nodes)DB=raw;               // v2
-  else DB=migrate(raw);                    // v1 → v2
-  if(!Array.isArray(DB.nodes))DB.nodes=[];
-  if(!Array.isArray(DB.reels))DB.reels=[];
-  if(!Array.isArray(DB.notifications))DB.notifications=[];
-  if(!Array.isArray(DB.submits))DB.submits=[];
-  if(!Array.isArray(DB.templates)||!DB.templates.length)DB.templates=defaultTemplates();
-  // ページ種別の補完（未設定は: 動画があればレビュー、なければセクション）
-  for(const n of DB.nodes)if(!n.type)n.type=(n.versions&&n.versions.length)?'review':'section';
-  // ステータスをレビューページ単位へ移行（旧: 最新バージョンの判定を引き継ぐ）
-  for(const n of DB.nodes)if(n.type==='review'&&n.status==null&&n.versions&&n.versions.length){const lv=n.versions[n.versions.length-1];n.status=(lv.review&&lv.review.status)||'pending'}
-  await persist();
-  updateFolderStatus();initSizeBtns();updateNotifBadge();
-  /* リロード時は前回開いていた画面を復元（無効ならホーム） */
-  let restored=false;
-  try{
-    const raw=localStorage.getItem('layna_loc');
-    if(raw){const loc=JSON.parse(raw);
-      if(loc&&loc.id&&getNode(loc.id)){
-        state.currentId=loc.id;
-        if(['timeline','progress','shots','browse'].includes(loc.tab))state.projTab=loc.tab;
-        for(const n of pathOf(loc.id))state.expanded.add(n.id);
-        render();resolveThumbs();restored=true;
+  /* グローバル(個人設定) */
+  const local=await storage.loadLocal();
+  DB={version:3,templates:(local&&local.templates&&local.templates.length)?local.templates:defaultTemplates(),
+      nodes:[],reels:(local&&Array.isArray(local.reels))?local.reels:[],
+      notifications:(local&&Array.isArray(local.notifications))?local.notifications:[],submits:[]};
+  /* 接続プロジェクト一覧 */
+  REG=await storage.loadRegistry();
+  /* 旧・単一DBからの移行（registry未作成のときのみ） */
+  if(!Array.isArray(REG)){
+    REG=[];
+    const legacy=await storage.loadLegacyDb();
+    if(legacy){
+      const lg=legacy.nodes?legacy:migrate(legacy);
+      DB.nodes=Array.isArray(lg.nodes)?lg.nodes:[];
+      DB.reels=Array.isArray(lg.reels)?lg.reels:DB.reels;
+      DB.notifications=Array.isArray(lg.notifications)?lg.notifications:DB.notifications;
+      DB.submits=Array.isArray(lg.submits)?lg.submits:[];
+      if(Array.isArray(lg.templates)&&lg.templates.length)DB.templates=lg.templates;
+      normalizeNodes();
+      syncRegistryFromDb();
+      await persist(); /* 新フォーマットで書き出し（kv/db は保険で残す） */
+    }else{
+      await storage.saveRegistry(REG);
+    }
+  }else{
+    /* 各プロジェクトのデータを読み込んでマージ */
+    for(const e of REG){
+      const data=await storage.loadProject(e.id);
+      if(data&&Array.isArray(data.nodes)){
+        for(const n of data.nodes)if(!DB.nodes.some(x=>x.id===n.id))DB.nodes.push(n);
+        if(Array.isArray(data.submits))for(const s of data.submits)if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
       }
     }
-  }catch(_){}
-  if(!restored){state.currentId=null;go(null)}
+    normalizeNodes();
+  }
+  updateFolderStatus();initSizeBtns();updateNotifBadge();
+  /* URL（ハッシュ）優先で画面を復元。無ければ localStorage、どちらも無ければホーム */
+  if(!applyHash(true)){
+    let restored=false;
+    try{
+      const raw=localStorage.getItem('layna_loc');
+      if(raw){const loc=JSON.parse(raw);
+        if(loc&&loc.id&&getNode(loc.id)){
+          state.currentId=loc.id;
+          if(['timeline','progress','shots','browse'].includes(loc.tab))state.projTab=loc.tab;
+          for(const n of pathOf(loc.id))state.expanded.add(n.id);
+          syncHash();render();resolveThumbs();restored=true;
+        }
+      }
+    }catch(_){}
+    if(!restored){state.currentId=null;go(null)}
+  }
+}
+/* ノードの種別・ステータス補完 */
+function normalizeNodes(){
+  for(const n of DB.nodes)if(!n.type)n.type=(n.versions&&n.versions.length)?'review':'section';
+  for(const n of DB.nodes)if(n.type==='review'&&n.status==null&&n.versions&&n.versions.length){const lv=n.versions[n.versions.length-1];n.status=(lv.review&&lv.review.status)||'pending'}
 }
 function updateFolderStatus(){const cur=(DB&&state&&state.currentId)?getNode(state.currentId):null;const root=cur?rootOf(cur):null;const hasFolder=!!(root&&root.folderName);$('#folderStatus').classList.toggle('connected',hasFolder);$('#folderName').textContent=storage.folderLabel()}
 
@@ -982,7 +1066,81 @@ async function subSendToReel(sb){
 /* ============================================================
    ナビ / レンダリング
    ============================================================ */
-function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);render()}
+function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;state.reviewOpen=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);syncHash();render()}
+/* ============================================================
+   URLルーティング（ハッシュ）— 画面ごとに固有URL・作業者間でリンク共有
+   #/                     ホーム
+   #/n/<nodeId>/<tab>     プロジェクト/セクション/レビューページ（tab: timeline|progress|shots|browse）
+   #/r/<nodeId>/<verId>   レビュー（動画FB）画面
+   ============================================================ */
+const VALID_TABS=['timeline','progress','shots','browse'];
+function hashOf(){
+  if(state.reviewOpen&&getNode(state.reviewOpen.nodeId))return '#/r/'+state.reviewOpen.nodeId+'/'+state.reviewOpen.versionId;
+  if(!state.currentId)return '#/';
+  return '#/n/'+state.currentId+'/'+(VALID_TABS.includes(state.projTab)?state.projTab:'timeline');
+}
+let _hashLock=false;
+function syncHash(){const h=hashOf();if(location.hash!==h){_hashLock=true;location.hash=h;setTimeout(()=>{_hashLock=false},0)}}
+function closeReviewOverlay(){const ov=$('#fbOverlay');if(ov)ov.remove();state.reviewOpen=null}
+/* ハッシュを解釈して画面を復元。initial=起動時（該当なしなら false を返し localStorage 復元に委譲） */
+function applyHash(initial){
+  const raw=(location.hash||'').replace(/^#\/?/,'');
+  const parts=raw.split('/').filter(x=>x!=='');
+  if(parts[0]==='r'&&parts[1]){
+    const n=getNode(parts[1]);
+    if(n){state.currentId=n.id;state.search='';state.projTab='browse';for(const x of pathOf(n.id))state.expanded.add(x.id);render();resolveThumbs();
+      const v=(n.versions||[]).find(x=>x.id===parts[2])||(n.versions||[])[(n.versions||[]).length-1];
+      if(v)openReview(n.id,v.id);return true}
+    return false;
+  }
+  if(parts[0]==='n'&&parts[1]){
+    const n=getNode(parts[1]);
+    if(n){closeReviewOverlay();state.currentId=n.id;state.search='';state.projTab=VALID_TABS.includes(parts[2])?parts[2]:'timeline';state.pmPick=null;for(const x of pathOf(n.id))state.expanded.add(x.id);render();resolveThumbs();return true}
+    return false;
+  }
+  if(!parts.length){if(initial)return false;closeReviewOverlay();state.currentId=null;state.projTab='timeline';state.reviewOpen=null;render();resolveThumbs();return true}
+  return false;
+}
+window.addEventListener('hashchange',()=>{if(_hashLock)return;applyHash(false)});
+
+/* ============================================================
+   プロジェクトの接続 / 解除（ユーザーは使うプロジェクトだけ接続する）
+   ============================================================ */
+async function connectProjectFlow(){
+  if(!storage.supportsFolder()){toast('このブラウザはフォルダ接続に未対応です（Chrome / Edge 推奨）');return}
+  let handle;
+  try{handle=await window.showDirectoryPicker({mode:'readwrite'})}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました');return}
+  let data=null;
+  try{const fh=await handle.getFileHandle(storage._projFileName);data=JSON.parse(await (await fh.getFile()).text())}catch(e){data=null}
+  if(!data||!Array.isArray(data.nodes)||!data.id){toast('選択したフォルダに Layna プロジェクトが見つかりません（layna.project.json が必要です）');return}
+  await storage.setProjRoot(data.id,handle);
+  /* 既に接続済みなら古いデータを入れ替え */
+  const oldIds=new Set([data.id,...DB.nodes.filter(n=>rootOfId(n)===data.id).map(n=>n.id)]);
+  DB.nodes=DB.nodes.filter(n=>!oldIds.has(n.id)&&n.id!==data.id);
+  DB.submits=(DB.submits||[]).filter(s=>s.projectId!==data.id);
+  for(const n of data.nodes)if(!DB.nodes.some(x=>x.id===n.id))DB.nodes.push(n);
+  if(Array.isArray(data.submits))for(const s of data.submits)if(!DB.submits.some(x=>x.id===s.id))DB.submits.push(s);
+  const root=getNode(data.id);if(root)root.folderName=handle.name;
+  normalizeNodes();
+  if(!REG.some(e=>e.id===data.id))REG.push({id:data.id,name:data.name||(root&&root.name)||'project',folderName:handle.name});
+  await persist();
+  toast('プロジェクト「'+((root&&root.name)||data.name)+'」を接続しました');
+  go(data.id);
+}
+/* DB を辿らずに rootOf の id を返す簡易版（接続処理中の一時判定用） */
+function rootOfId(node){let n=node;while(n&&n.parentId){const p=getNode(n.parentId);if(!p)break;n=p}return n?n.id:null}
+async function disconnectProject(id){
+  const root=getNode(id);if(!root)return;
+  if(!confirm('プロジェクト「'+root.name+'」の接続を解除しますか？\n（フォルダ内のデータは削除されません。再度「接続」で開けます）'))return;
+  const ids=new Set([id,...descendants(id).map(n=>n.id)]);
+  DB.nodes=DB.nodes.filter(n=>!ids.has(n.id));
+  DB.submits=(DB.submits||[]).filter(s=>s.projectId!==id);
+  REG=REG.filter(e=>e.id!==id);delete _saveCache.proj[id];
+  storage.projHandles.delete(id);
+  await persist();
+  toast('接続を解除しました');
+  go(null);
+}
 /* ホーム画面ではプロジェクト系ツールのヘッダーボタンを隠し、シンプルに */
 function updateHeaderForContext(){
   const home=!state.currentId;
@@ -1117,7 +1275,7 @@ function buildProjectTabs(root){
   for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['browse','階層']]){
     const active=onRoot?state.projTab===id:(id==='browse');
     const b=el('button','ptab'+(active?' on':''),lab);
-    b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);render()};
+    b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
     nav.appendChild(b);
   }
   return nav;
@@ -1339,7 +1497,10 @@ function renderHome(s){
   const wrap=el('div','home-screen');
   const head=el('div','home-hd');
   head.appendChild(el('div','ht','プロジェクト'));
-  head.appendChild(el('div','hs','制作中のプロジェクトを選択、または新規作成'));
+  head.appendChild(el('div','hs','使用するプロジェクトを選択・新規作成、または既存プロジェクトのフォルダを接続'));
+  const hacts=el('div','home-acts');
+  const conBtn=el('button','btn btn-ghost btn-sm','⇄ プロジェクトを接続');conBtn.title='他の人が作成した（または既存の）プロジェクトフォルダを開いて接続';conBtn.onclick=()=>connectProjectFlow();hacts.appendChild(conBtn);
+  head.appendChild(hacts);
   wrap.appendChild(head);
   const grid=el('div','proj-grid');
   for(const r of roots){
@@ -1851,6 +2012,12 @@ function openRename(node){
       }else{
         inner.appendChild(el('div','form-label','保存先フォルダ：お使いのブラウザはフォルダ保存に未対応です（Chrome / Edge 推奨）。ブラウザ内保存で動作します。'));
       }
+      /* このユーザーの接続を解除（データは消さない） */
+      inner.appendChild(el('div','divider'));
+      const dcWrap=el('div');dcWrap.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap';
+      dcWrap.appendChild(el('div','form-label','このプロジェクトを自分の一覧から外す（フォルダ内データは保持）'));
+      const dc=el('button','btn btn-ghost btn-sm','⇄ 接続を解除');dc.type='button';dc.onclick=()=>{closeModal();disconnectProject(node.id)};dcWrap.appendChild(dc);
+      inner.appendChild(dcWrap);
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
     const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}await persist();closeModal();render();resolveThumbs()};
@@ -1865,7 +2032,13 @@ async function deleteNode(node){
   const all=[node,...desc];
   for(const n of all)for(const v of n.versions||[]){await storage.delMedia(v.file);await storage.delMedia(v.thumb)}
   const ids=new Set(all.map(n=>n.id));
+  const isProject=!node.parentId;
   DB.nodes=DB.nodes.filter(n=>!ids.has(n.id));
+  DB.submits=(DB.submits||[]).filter(s=>!ids.has(s.nodeId||s.projectId)&&s.projectId!==node.id);
+  if(isProject){/* プロジェクト削除：保存データと接続情報も破棄 */
+    REG=REG.filter(e=>e.id!==node.id);delete _saveCache.proj[node.id];
+    try{await storage.delProject(node.id);await storage.clearProjRoot(node.id)}catch(_){}
+  }
   await persist();
   const parent=node.parentId;go(getNode(parent)?parent:null);
 }
@@ -1923,11 +2096,13 @@ function openReview(nodeId,versionId){
   const isVideo=v.type==='video';
   const old=$('#fbOverlay');if(old)old.remove();
   const ov=el('div','fb-overlay');ov.id='fbOverlay';
+  /* レビュー画面のURLを反映（作業者間でリンク共有可能に） */
+  state.reviewOpen={nodeId,versionId};syncHash();
 
   let FPS=v.fps||24,totalFrames=1,lastFrame=-1;
   let tool=null,erasing=false,pending=[],stroke=null,brushW=4,eraseW=16;
 
-  function close(){document.removeEventListener('keydown',onKey);ov.remove();render();resolveThumbs()}
+  function close(){document.removeEventListener('keydown',onKey);ov.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
 
   /* --- トップバー --- */
   const top=el('div','fb-top');
