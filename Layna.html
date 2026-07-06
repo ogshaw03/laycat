@@ -406,6 +406,19 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .drawer-hd .sp{flex:1}
 .drawer-hd .drawer-acts{display:flex;gap:8px;flex-shrink:0}
 .drawer-body{flex:1;min-height:0;overflow-y:auto;padding:16px 18px}
+/* 右側スライド上部：ショット内の全工程の最新動画タイル（横並び） */
+.stage-strip{margin:-4px 0 8px}
+.stage-strip .ss-h{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:8px}
+.stage-strip .ss-h svg{width:13px;height:13px}
+.ss-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px}
+.ss-tile{flex:0 0 auto;width:132px;cursor:pointer;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg2);transition:border-color .15s,box-shadow .15s}
+.ss-tile:hover{border-color:var(--edge);box-shadow:0 0 8px var(--edgeglow)}
+.ss-tile.cur{border-color:var(--text);box-shadow:0 0 0 1px var(--text)}
+.ss-th{position:relative;aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3);overflow:hidden}
+.ss-th img{width:100%;height:100%;object-fit:cover}
+.ss-play{position:absolute;right:5px;bottom:4px;font-size:9px;color:#fff;background:rgba(0,0,0,.55);border-radius:8px;padding:0 6px;line-height:15px}
+.ss-nm{display:flex;align-items:center;gap:5px;padding:5px 7px;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ss-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 /* 実際のタイルサイズでのプレビュー */
 .crop-preview{display:flex;flex-direction:column;gap:5px;align-items:flex-start;margin-top:2px}
 .crop-preview .cp-label{font-size:11px;color:var(--text3)}
@@ -1521,7 +1534,7 @@ function renderProjShots(main,cur){
     bd.appendChild(mt);
     tile.appendChild(bd);
     /* タイルクリックで該当動画（最新）のレビューページへ移動 */
-    tile.onclick=()=>{if(lv)openReviewDrawer(lv.node.id);else go(sh.id)};
+    tile.onclick=()=>{if(lv)openReviewDrawer(lv.node.id,sh.id);else go(sh.id)};
     grid.appendChild(tile);
   }
   main.appendChild(grid);
@@ -1813,10 +1826,35 @@ function buildDrawerShell(){
 function fillDrawer(){if(!state.drawer)return;if(state.drawer.kind==='submit')fillSubmitDrawer();else fillReviewDrawer()}
 function closeReviewDrawer(){state.drawer=null;const dr=$('#reviewDrawer');const ab=$('.app-body');if(ab)ab.classList.remove('drawer-open');if(!dr)return;dr.classList.remove('on');setTimeout(()=>{const b=$('#reviewDrawer');if(b&&!b.classList.contains('on'))b.remove()},280)}
 /* レビューページを右側スライドで表示。review以外は配下の最新動画の工程に解決 */
-function openReviewDrawer(nodeId){
+function openReviewDrawer(nodeId,shotId){
   let node=getNode(nodeId);if(!node)return;
   if(node.type!=='review'){const lv=latestVideoVersionUnder(node.id);if(lv&&lv.node)node=lv.node;}
-  state.drawer={kind:'review',id:node.id};buildDrawerShell();fillReviewDrawer();
+  state.drawer={kind:'review',id:node.id,shotId:shotId||null};buildDrawerShell();fillReviewDrawer();
+}
+/* 右側スライド上部：このショット内の全工程（レビュー）の最新動画をタイルで横並び表示 */
+function buildStageStrip(shot,curReviewId){
+  if(!shot)return null;
+  const reviews=descendants(shot.id).filter(n=>n.type==='review');
+  if(reviews.length<2)return null; /* 工程が1つだけなら横並びは出さない */
+  const wrap=el('div','stage-strip');
+  wrap.appendChild(elIco('div','ss-h','folder',' '+shot.name+' の工程'));
+  const row=el('div','ss-row');
+  for(const r of reviews){
+    const lv=[...r.versions].reverse().find(v=>v.type==='video')||r.versions[r.versions.length-1];
+    const t=el('div','ss-tile'+(r.id===curReviewId?' cur':''));t.title=r.name;
+    const th=el('div','ss-th');
+    if(lv&&lv.thumb){const img=el('img');img.dataset.ref=lv.thumb;th.appendChild(img)}
+    else if(r.thumbnail){const img=el('img');img.dataset.ref=r.thumbnail;th.appendChild(img)}
+    else th.appendChild(icoEl('film'));
+    if(lv&&lv.type==='video')th.appendChild(el('div','ss-play','▶'));
+    t.appendChild(th);
+    const stI=stInfo(r);const nm=el('div','ss-nm');const dot=el('span','ss-dot');dot.style.background=stI.color;nm.appendChild(dot);nm.appendChild(document.createTextNode(r.name));
+    t.appendChild(nm);
+    t.onclick=()=>openReviewDrawer(r.id,shot.id);
+    row.appendChild(t);
+  }
+  wrap.appendChild(row);
+  return wrap;
 }
 function fillReviewDrawer(){
   const back=$('#reviewDrawer');if(!back||!state.drawer||state.drawer.kind!=='review')return;
@@ -1826,6 +1864,9 @@ function fillReviewDrawer(){
   back._acts.innerHTML='';
   const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.title='このレビューページを通常表示で開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
   back._body.innerHTML='';curUploadUI=null;
+  /* 上部：このショット内の全工程の最新動画タイル（クリックで工程を切替） */
+  const shot=(state.drawer.shotId&&getNode(state.drawer.shotId))||(node.parentId?getNode(node.parentId):null);
+  const strip=buildStageStrip(shot,node.id);if(strip)back._body.appendChild(strip);
   renderReviewBody(back._body,node);
   resolveThumbs();
 }
