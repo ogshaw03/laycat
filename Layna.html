@@ -3055,6 +3055,8 @@ function openReel(){
   if(reelAlive()){reelWin.focus();return}
   reelWin=window.open('','layna_reel','width=1140,height=780');
   if(!reelWin){toast('ポップアップがブロックされました。許可してください');return}
+  /* 閉じて開き直したときは常に「空の新規リール」から（前回の作業内容は引き継がない） */
+  reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;
   const d=reelWin.document;
   d.open();d.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>Layna REEL</title></head><body></body></html>');d.close();
   const st=d.createElement('style');
@@ -3135,8 +3137,29 @@ function openReel(){
    +'.btn-sm{padding:4px 9px;font-size:12px}'
    +'.btn-ghost{border:1px solid #2a2a2f;color:#9a9aaa}'
    +'.note-shot{width:100%;display:block;border:1px solid #2a2a2f;border-radius:6px;margin-top:6px;background:#000}'
-   +'.hd{border-bottom:1px solid rgba(96,165,255,.5);box-shadow:0 1px 10px rgba(96,165,255,.14)}';
+   +'.hd{border-bottom:1px solid rgba(96,165,255,.5);box-shadow:0 1px 10px rgba(96,165,255,.14)}'
+   /* メニューバー（AE/Maya風のFileメニュー） */
+   +'.menubar{display:flex;align-items:center;gap:2px;padding:1px 6px;background:#0b0b0d;border-bottom:1px solid #2a2a2f;position:relative;z-index:60}'
+   +'.menubar .mi{padding:4px 12px;cursor:pointer;border-radius:4px;font-size:12px;color:#c8c8d0;position:relative}'
+   +'.menubar .mi:hover,.menubar .mi.open{background:#26262b;color:#fff}'
+   +'.menu-dd{position:absolute;top:calc(100% + 2px);left:0;background:#1c1c1f;border:1px solid #3a3a42;border-radius:6px;min-width:230px;padding:4px;box-shadow:0 10px 30px rgba(0,0,0,.6);display:none}'
+   +'.menu-dd.show{display:block}'
+   +'.menu-dd .item{padding:6px 10px;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;gap:24px;white-space:nowrap;color:#e8e8ec}'
+   +'.menu-dd .item:hover{background:#2e2e34}'
+   +'.menu-dd .item .sc{color:#5a5a6a;font-size:11px}'
+   +'.menu-dd .sep{height:1px;background:#2a2a2f;margin:4px 2px}'
+   +'.reel-title{color:#9a9aaa;font-size:12px;margin-left:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.reel-open-ov{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:200;display:flex;align-items:center;justify-content:center}'
+   +'.reel-open-box{background:#1c1c1f;border:1px solid #3a3a42;border-radius:10px;width:min(520px,92vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden}'
+   +'.reel-open-it{padding:9px 11px;border:1px solid #2a2a2f;border-radius:7px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;gap:12px}'
+   +'.reel-open-it:hover{border-color:#e8e8ec}';
   d.head.appendChild(st);
+  /* メニューバー（File プルダウン）。ハンドラは loadCur 定義後に配線 */
+  const menubar=ce(d,'div','menubar');
+  const fileMi=ce(d,'div','mi','File');menubar.appendChild(fileMi);
+  const fileDD=ce(d,'div','menu-dd');fileMi.appendChild(fileDD);
+  const reelTitle=ce(d,'span','reel-title','未保存のリール');menubar.appendChild(reelTitle);
+  d.body.appendChild(menubar);
   /* ヘッダ */
   const hd=ce(d,'div','hd');
   const lg=ce(d,'div','logo');lg.innerHTML='<svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">'+ICONS.reel+'</svg> REEL <b>/ Layna</b>';hd.appendChild(lg);
@@ -3455,7 +3478,64 @@ function openReel(){
   prev.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.max(0,reelUI.cur-1);loadCur(true)};
   next.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.min(cs().length-1,reelUI.cur+1);loadCur(true)};
   loopBtn.onclick=()=>{reelUI.loop=!reelUI.loop;loopBtn.classList.toggle('on',reelUI.loop)};
-  clearBtn.onclick=()=>{if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;video.pause();video.removeAttribute('src');video.load();reelRender()};
+  clearBtn.onclick=()=>{if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;video.pause();video.removeAttribute('src');video.load();reelRender();updReelTitle()};
+  /* ==== File メニュー（新規 / 開く / 保存 / 名前を付けて保存）— AE/Maya風 ==== */
+  function updReelTitle(){const r=reelUI.reelId?DB.reels.find(x=>x.id===reelUI.reelId):null;reelTitle.textContent=(r?r.name:'未保存のリール')+(reelUI.clips.length?'':'（空）')}
+  function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
+  function closeOpenOv(){const ov=d.getElementById('reelOpenOv');if(ov)ov.remove()}
+  function doNew(){reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();reelRender();updReelTitle()}
+  async function doSave(forceNew){
+    const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
+    if(!clips.length){reelWin.alert('保存するクリップがありません');return}
+    let r=(!forceNew&&reelUI.reelId)?DB.reels.find(x=>x.id===reelUI.reelId):null;
+    if(r){r.clips=clips}
+    else{const name=reelWin.prompt('リール名',forceNew?'':('Reel '+((DB.reels.length||0)+1)));if(!name)return;r={id:newId('reel'),name:name.trim(),clips,createdAt:nowIso()};DB.reels.push(r);reelUI.reelId=r.id}
+    r.projectId=reelProjectId(r);
+    if(!r.projectId)reelWin.alert('保存先プロジェクトが特定できませんでした（クリップの動画が接続中のプロジェクトに属している必要があります）');
+    await persist();updReelTitle();try{render();resolveThumbs()}catch(_){}
+    saveReelBtn.textContent='保存済 ✓';setTimeout(()=>{saveReelBtn.textContent='💾 リール保存'},900);
+  }
+  async function openReelHere(reelId){
+    const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
+    reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;video.pause();video.removeAttribute('src');video.load();reelRender();
+    for(const ref of (r.clips||[])){const n=getNode(ref.nodeId);const vv=n&&n.versions.find(x=>x.id===ref.vId);if(n&&vv)await reelAddClip(n,vv)}
+    if(reelUI.loadCur)reelUI.loadCur(false);
+    reelRender();updReelTitle();
+  }
+  function doOpen(){
+    closeMenu();closeOpenOv();
+    const ov=ce(d,'div','reel-open-ov');ov.id='reelOpenOv';
+    const box=ce(d,'div','reel-open-box');
+    const bh=ce(d,'div');bh.style.cssText='padding:12px 14px;border-bottom:1px solid #2a2a2f;font-weight:600';bh.textContent='リールを開く';box.appendChild(bh);
+    const list=ce(d,'div');list.style.cssText='overflow-y:auto;padding:8px';
+    const reels=(DB.reels||[]).slice().reverse();
+    if(!reels.length){const e=ce(d,'div',null,'保存されたリールがありません');e.style.cssText='color:#5a5a6a;padding:24px;text-align:center';list.appendChild(e)}
+    for(const r of reels){
+      const it=ce(d,'div','reel-open-it');
+      it.appendChild(ce(d,'span',null,r.name));
+      const proj=r.projectId?getNode(r.projectId):null;
+      const meta=ce(d,'span',null,(proj?proj.name+'・':'')+((r.clips&&r.clips.length)||0)+'クリップ');meta.style.cssText='color:#5a5a6a;font-size:11px';it.appendChild(meta);
+      it.onclick=async()=>{ov.remove();await openReelHere(r.id)};
+      list.appendChild(it);
+    }
+    box.appendChild(list);
+    const bf=ce(d,'div');bf.style.cssText='padding:10px 14px;border-top:1px solid #2a2a2f;text-align:right';
+    const cb=ce(d,'button','btn','閉じる');cb.onclick=()=>ov.remove();bf.appendChild(cb);box.appendChild(bf);
+    ov.appendChild(box);ov.onclick=e=>{if(e.target===ov)ov.remove()};
+    d.body.appendChild(ov);
+  }
+  const mkMenuItem=(label,sc,fn)=>{const it=ce(d,'div','item');it.appendChild(ce(d,'span',null,label));if(sc)it.appendChild(ce(d,'span','sc',sc));it.onclick=e=>{e.stopPropagation();closeMenu();fn()};fileDD.appendChild(it);return it};
+  mkMenuItem('新規','Ctrl+N',doNew);
+  mkMenuItem('開く…','Ctrl+O',doOpen);
+  fileDD.appendChild(ce(d,'div','sep'));
+  mkMenuItem('保存','Ctrl+S',()=>doSave(false));
+  mkMenuItem('名前を付けて保存…','Ctrl+Shift+S',()=>doSave(true));
+  fileMi.onclick=e=>{e.stopPropagation();const willOpen=!fileDD.classList.contains('show');closeMenu();if(willOpen){fileMi.classList.add('open');fileDD.classList.add('show')}};
+  d.addEventListener('click',()=>closeMenu());
+  d.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeOpenOv();return}if(e.ctrlKey||e.metaKey){const k=(e.key||'').toLowerCase();if(k==='s'){e.preventDefault();doSave(!!e.shiftKey)}else if(k==='o'){e.preventDefault();doOpen()}else if(k==='n'){e.preventDefault();doNew()}}});
+  saveReelBtn.onclick=()=>doSave(false); /* ヘッダの保存ボタンも File>保存 と同じ挙動 */
+  reelUI.updTitle=updReelTitle; /* メインウィンドウから開いたときのタイトル更新用 */
+  updReelTitle();
   video.addEventListener('play',()=>{play.textContent='⏸ 停止'});
   video.addEventListener('pause',()=>{play.textContent='▶ 再生'});
   video.addEventListener('ended',()=>{
@@ -3583,6 +3663,7 @@ async function openReelFromSaved(reelId){
     if(n&&vv)await reelAddClip(n,vv);
   }
   if(reelUI.loadCur)reelUI.loadCur(false);
+  if(reelUI.updTitle)reelUI.updTitle();
 }
 
 /* ============================================================
