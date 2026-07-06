@@ -3740,6 +3740,18 @@ function openReel(){
   function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
   function closeOpenOv(){const ov=d.getElementById('reelOpenOv');if(ov)ov.remove()}
   function doNew(){if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。新規リールを作ると失われます。続けますか？'))return;reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();try{vNext.removeAttribute('src');vNext.load()}catch(_){}resetView();reelRender();updReelTitle();updUnsent()}
+  /* リール保存（File メニュー / Ctrl+S から）。ヘッダのボタンは廃止済み */
+  async function doSave(forceNew){
+    const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
+    if(!clips.length){reelWin.alert('保存するクリップがありません');return}
+    let r=(!forceNew&&reelUI.reelId)?DB.reels.find(x=>x.id===reelUI.reelId):null;
+    if(r){r.clips=clips}
+    else{const name=reelWin.prompt('リール名',forceNew?'':('Reel '+((DB.reels.length||0)+1)));if(!name)return;r={id:newId('reel'),name:name.trim(),clips,createdAt:nowIso()};DB.reels.push(r);reelUI.reelId=r.id}
+    r.projectId=reelProjectId(r);
+    if(!r.projectId)reelWin.alert('保存先プロジェクトが特定できませんでした（クリップの動画が接続中のプロジェクトに属している必要があります）');
+    await persist();updReelTitle();try{render();resolveThumbs()}catch(_){}
+    const orig=fileMi.textContent;fileMi.textContent='保存済 ✓';setTimeout(()=>{fileMi.textContent=orig},900);
+  }
   async function openReelHere(reelId){
     const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
     if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。別のリールを開くと失われます。続けますか？'))return;
@@ -3775,9 +3787,12 @@ function openReel(){
   const mkMenuItem=(label,sc,fn)=>{const it=ce(d,'div','item');it.appendChild(ce(d,'span',null,label));if(sc)it.appendChild(ce(d,'span','sc',sc));it.onclick=e=>{e.stopPropagation();closeMenu();fn()};fileDD.appendChild(it);return it};
   mkMenuItem('新規','Ctrl+N',doNew);
   mkMenuItem('開く…','Ctrl+O',doOpen);
+  fileDD.appendChild(ce(d,'div','sep'));
+  mkMenuItem('保存','Ctrl+S',()=>doSave(false));
+  mkMenuItem('名前を付けて保存…','Ctrl+Shift+S',()=>doSave(true));
   fileMi.onclick=e=>{e.stopPropagation();const willOpen=!fileDD.classList.contains('show');closeMenu();if(willOpen){fileMi.classList.add('open');fileDD.classList.add('show')}};
   d.addEventListener('click',()=>closeMenu());
-  d.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeOpenOv();return}if(e.ctrlKey||e.metaKey){const k=(e.key||'').toLowerCase();if(k==='o'){e.preventDefault();doOpen()}else if(k==='n'){e.preventDefault();doNew()}}});
+  d.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMenu();closeOpenOv();return}if(e.ctrlKey||e.metaKey){const k=(e.key||'').toLowerCase();if(k==='s'){e.preventDefault();doSave(!!e.shiftKey)}else if(k==='o'){e.preventDefault();doOpen()}else if(k==='n'){e.preventDefault();doNew()}}});
   reelUI.updTitle=updReelTitle; /* メインウィンドウから開いたときのタイトル更新用 */
   updReelTitle();
   /* 二重バッファの両方にリスナーを付け、アクティブ側のイベントだけ処理する
