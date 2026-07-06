@@ -1658,12 +1658,11 @@ function renderProjProgress(main,cur){
     /* 現在のステータスセル（ステータスバッジ） */
     const statusCell=ps=>{const td=el('td');const si=stInfo(ps.curNode||ps.shot);if(ps.curNode){const b=el('span','pm-badge',si.label);b.style.background=si.color;td.appendChild(b)}else td.appendChild(el('span','pm-pct','未着手'));return td};
     const t=el('table','pm-stbl');const th=el('tr');
-    /* 工程グラフ：現在の工程＋現在のステータス／ステータスグラフ：現在のステータス＋現在の工程 */
-    ['ショット',(isStage?'現在の工程':'現在のステータス'),(isStage?'現在のステータス':'現在の工程')].forEach(h=>th.appendChild(el('th',null,h)));t.appendChild(th);
+    /* 工程グラフ・ステータスグラフとも列順を統一（現在の工程→現在のステータス）で視認性を確保 */
+    ['ショット','現在の工程','現在のステータス'].forEach(h=>th.appendChild(el('th',null,h)));t.appendChild(th);
     for(const ps of p.perShot){
       const tr=el('tr');const c1=el('td');c1.appendChild(el('span','sn',ps.shot.name));tr.appendChild(c1);
-      if(isStage){tr.appendChild(stageCell(ps));tr.appendChild(statusCell(ps))}
-      else{tr.appendChild(statusCell(ps));tr.appendChild(stageCell(ps))}
+      tr.appendChild(stageCell(ps));tr.appendChild(statusCell(ps));
       t.appendChild(tr);
     }
     main.appendChild(t);
