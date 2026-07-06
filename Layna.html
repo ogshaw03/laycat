@@ -1523,11 +1523,12 @@ function renderProjShots(main,cur){
 }
 /* ==== ショットタブのタイル自動再生 ====
    ・画面に表示中のタイルのみ再生（IntersectionObserver）
-   ・負荷軽減のため、表示サイズの半分の解像度のキャンバスへ ~15fps で描画（ハーフ解像度）
+   ・負荷軽減のため、表示サイズの半分の解像度のキャンバスへ描画（ハーフ解像度）。
+     フレームレートは間引かず requestAnimationFrame で毎フレーム描画
    ・ミュート／ループ。画面外に出たら停止して動画ソースを解放 */
 let _shotObs=null,_shotCanvases=[];
 function tileStop(cv){
-  const tv=cv._tv;if(tv){if(tv.timer){clearInterval(tv.timer);tv.timer=0}if(tv.video){try{tv.video.pause();tv.video.removeAttribute('src');tv.video.load()}catch(_){}}tv.playing=false}
+  const tv=cv._tv;if(tv){if(tv.raf){cancelAnimationFrame(tv.raf);tv.raf=0}if(tv.video){try{tv.video.pause();tv.video.removeAttribute('src');tv.video.load()}catch(_){}}tv.playing=false}
   try{const c=cv.getContext('2d');c&&c.clearRect(0,0,cv.width,cv.height)}catch(_){}
 }
 async function tileStart(cv){
@@ -1540,12 +1541,13 @@ async function tileStart(cv){
   let v=tv.video;if(!v){v=tv.video=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('muted','');v.preload='auto';v.disablePictureInPicture=true}
   v.src=url;try{await v.play()}catch(_){}
   const ctx=cv.getContext('2d');
-  tv.timer=setInterval(()=>{
+  const draw=()=>{
     if(!tv.playing)return;
     if(!document.contains(cv)){tileStop(cv);return}
-    if(v.readyState<2)return;
-    try{ctx.drawImage(v,0,0,cv.width,cv.height)}catch(_){}
-  },1000/15);
+    if(v.readyState>=2){try{ctx.drawImage(v,0,0,cv.width,cv.height)}catch(_){}}
+    tv.raf=requestAnimationFrame(draw); /* フレームは間引かない */
+  };
+  tv.raf=requestAnimationFrame(draw);
 }
 function stopShotAutoplay(){
   if(_shotObs){_shotObs.disconnect();_shotObs=null}
