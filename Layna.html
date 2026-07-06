@@ -300,6 +300,17 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .log-note-input textarea{flex:1;min-height:38px;max-height:140px;resize:vertical;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;line-height:1.5}
 .log-note-input textarea:focus{outline:none;border-color:var(--border2)}
 .log-empty-note{font-size:12px;color:var(--text3)}
+/* ショットコメント（動画FBとは独立） */
+.shot-comments{max-width:1200px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:6px}
+.shot-comments .section-label{margin:0 0 10px}
+.shot-comments .sc-count{font-weight:600;color:var(--text2);letter-spacing:0}
+.sc-input{display:flex;gap:8px;align-items:flex-start}
+.sc-input textarea{flex:1;min-height:40px;max-height:160px;resize:vertical;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;line-height:1.5;font-family:inherit}
+.sc-input textarea:focus{outline:none;border-color:var(--border2)}
+.sc-input .btn{flex-shrink:0}
+.sc-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.sc-item .m{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.sc-empty{font-size:12px;color:var(--text3);padding:2px}
 .note-acts{margin-left:auto;display:inline-flex;gap:4px}
 .na{font-size:11px;color:var(--text3);padding:2px 6px;border-radius:4px}
 .na:hover{color:var(--text);background:rgba(255,255,255,.08)}
@@ -1642,7 +1653,54 @@ function renderSectionBody(s,cur){
 }
 
 /* レビューページ（動画FBログを縦に蓄積・ShotGrid型／子項目なし） */
+/* ショット（レビューページ）への独立コメント。動画へのFB（v.review.notes）とは別に
+   node.comments へ保存する。ページ上部にフィールドを設置して入力・送信できる。 */
+function shotCommentItem(cur,c){
+  const it=el('div','log-note sc-item');
+  const m=el('div','m');
+  m.appendChild(el('span',null,(c.author||'—')+'・'+fmt(c.time)+(c.edited?'（編集済）':'')));
+  const t=el('div','t',c.text);
+  if((c.author||'')===currentUser()){
+    const acts=el('span','note-acts');
+    const ed=el('button','na','✎ 編集');const del=el('button','na','✕');del.title='削除';
+    acts.appendChild(ed);acts.appendChild(del);m.appendChild(acts);
+    del.onclick=async()=>{if(!window.confirm('このコメントを削除しますか？'))return;cur.comments=(cur.comments||[]).filter(x=>x!==c);await persist();renderBody()};
+    ed.onclick=()=>{
+      if(it.querySelector('textarea'))return;
+      const ta=el('textarea','fb-edit-ta');ta.value=c.text;
+      const row=el('div','edit-row');
+      const save=el('button','btn btn-primary btn-sm','保存');const cancel=el('button','btn btn-ghost btn-sm','取消');
+      row.appendChild(save);row.appendChild(cancel);
+      t.style.display='none';it.appendChild(ta);it.appendChild(row);ta.focus();
+      cancel.onclick=()=>{ta.remove();row.remove();t.style.display=''};
+      save.onclick=async()=>{const nv=(ta.value||'').trim();if(!nv)return;c.text=nv;c.edited=true;await persist();renderBody()};
+    };
+  }
+  it.appendChild(m);it.appendChild(t);
+  return it;
+}
+function shotCommentBox(cur){
+  const wrap=el('div','shot-comments');
+  const head=el('div','section-label');head.appendChild(el('span',null,'ショットコメント'));
+  const cs=(cur.comments||[]);
+  head.appendChild(el('span','sc-count',cs.length?cs.length+' 件':''));
+  wrap.appendChild(head);
+  const inp=el('div','sc-input');
+  const ta=el('textarea');ta.placeholder='このショットへのコメント（動画へのFBとは別に記録されます・Ctrl+Enterで送信）';
+  const send=el('button','btn btn-primary btn-sm','送信');
+  const submit=async()=>{const txt=(ta.value||'').trim();if(!txt)return;(cur.comments=cur.comments||[]).push({id:newId('sc'),author:currentUser(),text:txt,time:nowIso()});ta.value='';await persist();renderBody()};
+  send.onclick=submit;
+  ta.onkeydown=e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();submit()}};
+  inp.appendChild(ta);inp.appendChild(send);
+  wrap.appendChild(inp);
+  const list=el('div','sc-list');
+  if(!cs.length)list.appendChild(el('div','sc-empty','まだショットコメントはありません'));
+  else [...cs].reverse().forEach(c=>list.appendChild(shotCommentItem(cur,c)));
+  wrap.appendChild(list);
+  return wrap;
+}
 function renderReviewBody(s,cur){
+  s.appendChild(shotCommentBox(cur)); /* 上部：独立したショットコメント欄 */
   const ll=el('div','section-label');ll.appendChild(el('span',null,'動画FBログ / ディレクターチェック'));
   const acts=el('div','acts');
   const fo=el('button','btn btn-ghost btn-sm'+(state.frameOrder?' tool active':''),state.frameOrder?'フレーム順 ✓':'フレーム順');
