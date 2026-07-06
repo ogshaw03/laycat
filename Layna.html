@@ -867,6 +867,7 @@ async function boot(){
     try{
       const raw=localStorage.getItem('layna_loc');
       if(raw){const loc=JSON.parse(raw);
+        if(loc&&loc.lastPageId&&getNode(loc.lastPageId))state.lastPageId=loc.lastPageId;
         if(loc&&loc.id&&getNode(loc.id)){
           state.currentId=loc.id;
           if(['timeline','progress','shots','browse'].includes(loc.tab))state.projTab=loc.tab;
@@ -1237,7 +1238,7 @@ function updateHeaderForContext(){
   /* 保存先インジケータはプロジェクト内でのみ表示 */
   setD('#folderStatus',!home);updateFolderStatus();
 }
-function saveLoc(){try{localStorage.setItem('layna_loc',JSON.stringify({id:state.currentId||null,tab:state.projTab||'timeline'}))}catch(_){}}
+function saveLoc(){try{localStorage.setItem('layna_loc',JSON.stringify({id:state.currentId||null,tab:state.projTab||'timeline',lastPageId:state.lastPageId||null}))}catch(_){}}
 function render(){renderSidebar();renderBreadcrumb();renderMainHead();renderBody();updateHeaderForContext();resolveThumbs();saveLoc();try{if(pgWin&&!pgWin.closed)pgBuild()}catch(_){}try{if(slWin&&!slWin.closed)slBuild()}catch(_){}}
 
 /* サイドバー：ツリー */
@@ -1363,7 +1364,11 @@ function buildProjectTabs(root){
   for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['browse','ページ']]){
     const active=onRoot?state.projTab===id:(id==='browse');
     const b=el('button','ptab'+(active?' on':''),lab);
-    b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
+    b.onclick=()=>{
+      /* 「ページ」タブは最後に開いていた画面へ復帰（同一プロジェクト内・存在する場合） */
+      let target=root.id;
+      if(id==='browse'){const lp=state.lastPageId&&getNode(state.lastPageId);if(lp&&rootOf(lp).id===root.id)target=state.lastPageId}
+      state.currentId=target;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(target))state.expanded.add(n.id);syncHash();render()};
     nav.appendChild(b);
   }
   return nav;
@@ -1401,11 +1406,12 @@ function renderBodyMain(){
     const main=el('div','home-main');s.appendChild(main);
     if(state.projTab==='progress')renderProjProgress(main,root);
     else if(state.projTab==='shots')renderProjShots(main,root);
-    else if(state.projTab==='browse')renderSectionBody(main,root);
+    else if(state.projTab==='browse'){state.lastPageId=root.id;renderSectionBody(main,root)}
     else renderProjTimeline(main,root);
     return;
   }
   /* サブページ（セクション/レビュー）— 上部タブは「ページ」がアクティブ表示 */
+  state.lastPageId=cur.id; /* 「ページ」タブで最後に開いた画面として記憶 */
   if(cur.type==='review')renderReviewBody(s,cur);
   else renderSectionBody(s,cur);
 }
@@ -1684,19 +1690,39 @@ function renderHome(s){
 }
 
 /* セクションページ（子項目タイルのみ・動画追加不可）。cur は非nullのセクション/検索中のルート */
+/* 「ページ」タブ：辿って探すのではなく、配下のレビュー（工程）を一覧表示し、
+   クリックでそのレビューページを同タブに開く。フォルダの深い辿りは廃止（探索はサイドバーで）。 */
+function pageReviewCard(cur,r){
+  const card=el('div','vcard');
+  const tw=el('div','vcard-thumb');
+  const lv=r.versions[r.versions.length-1];
+  if(r.thumbnail){const img=el('img');img.dataset.ref=r.thumbnail;tw.appendChild(img)}
+  else if(lv&&lv.thumb){const img=el('img');img.dataset.ref=lv.thumb;tw.appendChild(img)}
+  else{const ni=el('div','vcard-noimg');const g=el('div','g');g.appendChild(icoEl('film'));ni.appendChild(g);ni.appendChild(el('div','lab',r.versions.length?r.versions.length+' 本':'レビュー'));tw.appendChild(ni)}
+  const stI=stInfo(r);const bdg=el('div','vcard-badge',stI.label);bdg.style.background=hexA(stI.color,.85);bdg.style.color='#101013';tw.appendChild(bdg);
+  if(r.versions.length)tw.appendChild(el('div','vcard-cnt','▶ '+r.versions.length));
+  /* 現在のセクションより下のパス（どのショットの工程か）を表示 */
+  const rel=pathOf(r.id);const ci=rel.findIndex(n=>n.id===cur.id);const relPath=rel.slice(ci>=0?ci+1:1,-1).map(n=>n.name).join(' / ');
+  const ov=el('div','vcard-ov');ov.appendChild(elIco('div','t','film',' '+(relPath?relPath+' / ':'')+r.name));tw.appendChild(ov);
+  const a=el('div','vcard-actions');const del=el('button','vcard-act');del.appendChild(icoEl('trash'));del.title='削除';del.onclick=e=>{e.stopPropagation();deleteNode(r)};a.appendChild(del);tw.appendChild(a);
+  card.appendChild(tw);
+  card.onclick=()=>go(r.id);
+  return card;
+}
 function renderSectionBody(s,cur){
-  const parentId=cur.id;
   const q=state.search.trim().toLowerCase();
-  let kids=childrenOf(parentId);
-  if(q)kids=kids.filter(n=>n.name.toLowerCase().includes(q));
-  const secl=el('div','section-label');secl.appendChild(el('span',null,'サブ項目 / 工程'));
+  let reviews=descendants(cur.id).filter(n=>n.type==='review');
+  if(q)reviews=reviews.filter(n=>(n.name+' '+pathOf(n.id).map(x=>x.name).join(' ')).toLowerCase().includes(q));
+  /* 直下の工程（レビュー）を優先して手前に並べる */
+  reviews.sort((a,b)=>{const da=(a.parentId===cur.id?0:1),db=(b.parentId===cur.id?0:1);return da-db;});
+  const secl=el('div','section-label');secl.appendChild(el('span',null,'レビュー（工程）'));
   const acts=el('div','acts');
-  const addBtn=el('button','btn btn-ghost btn-sm','+ 追加');addBtn.onclick=()=>openAddModal(parentId);acts.appendChild(addBtn);
+  const addBtn=el('button','btn btn-ghost btn-sm','+ 追加');addBtn.onclick=()=>openAddModal(cur.id);acts.appendChild(addBtn);
   secl.appendChild(acts);
   s.appendChild(secl);
-  if(!kids.length){s.appendChild(el('div','empty','まだ項目がありません。「+ 追加」で工程（レビュー）や下位セクションを作成してください。'));return}
+  if(!reviews.length){s.appendChild(el('div','empty','このフォルダ配下にレビュー（工程）がありません。「+ 追加」で作成するか、左のツリーから項目を選択してください。'));return}
   const grid=el('div','grid');
-  for(const n of kids)grid.appendChild(nodeCard(n,false));
+  for(const r of reviews)grid.appendChild(pageReviewCard(cur,r));
   s.appendChild(grid);
 }
 
