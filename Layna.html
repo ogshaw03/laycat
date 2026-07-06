@@ -380,6 +380,16 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .crop-box img{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .crop-hint{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;pointer-events:none}
 .crop-slider{width:100%}
+/* レビューページの右側スライド表示（ドロワー） */
+.drawer-back{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1200;opacity:0;transition:opacity .22s ease}
+.drawer-back.on{opacity:1}
+.drawer{position:absolute;top:0;right:0;height:100%;width:min(720px,94vw);background:var(--bg);border-left:1px solid var(--edge);box-shadow:-10px 0 34px rgba(0,0,0,.5);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .26s cubic-bezier(.16,1,.3,1)}
+.drawer-back.on .drawer{transform:translateX(0)}
+.drawer-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--edge);box-shadow:0 1px 10px var(--edgeglow);background:var(--bg2);flex-shrink:0}
+.drawer-hd .drawer-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer-hd .drawer-path{color:var(--text3);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer-hd .sp{flex:1}
+.drawer-body{flex:1;min-height:0;overflow-y:auto;padding:16px 18px}
 /* 実際のタイルサイズでのプレビュー */
 .crop-preview{display:flex;flex-direction:column;gap:5px;align-items:flex-start;margin-top:2px}
 .crop-preview .cp-label{font-size:11px;color:var(--text3)}
@@ -1122,7 +1132,7 @@ async function subSendToReel(sb){
 /* ============================================================
    ナビ / レンダリング
    ============================================================ */
-function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;state.reviewOpen=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);syncHash();render()}
+function go(id){closeReviewDrawer();state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;state.reviewOpen=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);syncHash();render()}
 /* ============================================================
    URLルーティング（ハッシュ）— 画面ごとに固有URL・作業者間でリンク共有
    #/                     ホーム
@@ -1360,7 +1370,8 @@ function folderWarnBanner(root){
   }
   return b;
 }
-function renderBody(){
+function renderBody(){renderBodyMain();if(state.reviewDrawer&&$('#reviewDrawer'))fillReviewDrawer();}
+function renderBodyMain(){
   const s=$('#scroll');s.innerHTML='';curUploadUI=null;
   const cur=state.currentId?getNode(state.currentId):null;
   if(!cur){renderHome(s);return}
@@ -1424,7 +1435,7 @@ function renderProjTimeline(main,cur){
   for(const e of evs){
     if(e.type==='submit'){tl.appendChild(tlSubmitItem(e,cur));continue}
     /* ショットの枠全体をクリックで該当ショットへ移動 */
-    const it=el('div','tl-item');it.onclick=()=>go(e.node.id);it.title='クリックで開く';
+    const it=el('div','tl-item');it.onclick=()=>openReviewDrawer(e.node.id);it.title='クリックでレビューを右側に表示';
     const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;
     it.appendChild(th);
     const bd=el('div','tl-body');
@@ -1483,7 +1494,7 @@ function renderProjShots(main,cur){
     bd.appendChild(mt);
     tile.appendChild(bd);
     /* タイルクリックで該当動画（最新）のレビューページへ移動 */
-    tile.onclick=()=>{if(lv)go(lv.node.id);else go(sh.id)};
+    tile.onclick=()=>{if(lv)openReviewDrawer(lv.node.id);else go(sh.id)};
     grid.appendChild(tile);
   }
   main.appendChild(grid);
@@ -1644,6 +1655,40 @@ function renderReviewBody(s,cur){
   [...cur.versions].reverse().forEach(v=>log.appendChild(logItem(cur,v)));
   s.appendChild(log);
 }
+/* レビューページを右側スライド（ドロワー）で表示。
+   review以外のノードは配下の最新動画の工程（review）に解決 */
+function openReviewDrawer(nodeId){
+  let node=getNode(nodeId);if(!node)return;
+  if(node.type!=='review'){const lv=latestVideoVersionUnder(node.id);if(lv&&lv.node)node=lv.node;}
+  state.reviewDrawer=node.id;
+  let back=$('#reviewDrawer');
+  if(!back){
+    back=el('div','drawer-back');back.id='reviewDrawer';
+    const dr=el('div','drawer');
+    const hd=el('div','drawer-hd');
+    const ti=el('div');ti.style.minWidth='0';const t=el('div','drawer-title');const p=el('div','drawer-path');ti.appendChild(t);ti.appendChild(p);hd.appendChild(ti);
+    hd.appendChild(el('div','sp'));
+    const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.title='このレビューページを通常表示で開く';openB.onclick=()=>{const id=state.reviewDrawer;closeReviewDrawer();if(id)go(id)};hd.appendChild(openB);
+    const cl=el('button','btn btn-ghost btn-sm','✕ 閉じる');cl.onclick=closeReviewDrawer;hd.appendChild(cl);
+    const body=el('div','drawer-body');
+    dr.appendChild(hd);dr.appendChild(body);back.appendChild(dr);
+    back.onclick=e=>{if(e.target===back)closeReviewDrawer()};
+    document.body.appendChild(back);
+    back._t=t;back._p=p;back._body=body;
+    requestAnimationFrame(()=>back.classList.add('on'));
+  }
+  fillReviewDrawer();
+}
+function fillReviewDrawer(){
+  const back=$('#reviewDrawer');if(!back||!state.reviewDrawer)return;
+  const node=getNode(state.reviewDrawer);if(!node||node.type!=='review'){closeReviewDrawer();return}
+  back._t.textContent=node.name;
+  back._p.textContent=pathOf(node.id).slice(1,-1).map(x=>x.name).join(' / ')||rootOf(node).name;
+  back._body.innerHTML='';curUploadUI=null;
+  renderReviewBody(back._body,node);
+  resolveThumbs();
+}
+function closeReviewDrawer(){state.reviewDrawer=null;const back=$('#reviewDrawer');if(!back)return;back.classList.remove('on');setTimeout(()=>{const b=$('#reviewDrawer');if(b&&!b.classList.contains('on'))b.remove()},280)}
 
 function nodeCard(node,isRoot){
   const isRev=node.type==='review';const kids=childrenOf(node.id);const card=el('div','vcard');
@@ -1890,8 +1935,8 @@ function logItem(node,v){
 }
 
 async function resolveThumbs(){
-  for(const img of document.querySelectorAll('#scroll img[data-ref],#scroll .log-thumb[data-ref]')){const ref=img.dataset.ref;const url=await storage.getURL(ref);if(url){if(img.tagName==='IMG')img.src=url;else img.style.backgroundImage='url("'+url+'")'}}
-  for(const v of document.querySelectorAll('#scroll video[data-vref]')){if(v.dataset.poster){const p=await storage.getURL(v.dataset.poster);if(p)v.poster=p}const src=await storage.getURL(v.dataset.vref);if(src&&v.src!==src)v.src=src}
+  for(const img of document.querySelectorAll('#scroll img[data-ref],#scroll .log-thumb[data-ref],#reviewDrawer img[data-ref]')){const ref=img.dataset.ref;const url=await storage.getURL(ref);if(url){if(img.tagName==='IMG')img.src=url;else img.style.backgroundImage='url("'+url+'")'}}
+  for(const v of document.querySelectorAll('#scroll video[data-vref],#reviewDrawer video[data-vref]')){if(v.dataset.poster){const p=await storage.getURL(v.dataset.poster);if(p)v.poster=p}const src=await storage.getURL(v.dataset.vref);if(src&&v.src!==src)v.src=src}
 }
 /* サムネイルのトリミング表示：元画像は変えず、縦横比タイルに合わせて位置・拡大で表示。
    crop={s:拡大率(>=1), fx/fy:パン位置(-0.5..0.5, 0=中央)} は解像度非依存 */
@@ -3702,7 +3747,7 @@ window.addEventListener('drop',async e=>{
   for(const f of files)await openUploadModal(node,f);
 });
 $('#searchInput').oninput=e=>{state.search=e.target.value;renderBody();resolveThumbs()};
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#reviewDrawer')){closeReviewDrawer();return}closeModal()}});
 async function startAppFlow(){
   /* 保存先はブラウザ内保存(IndexedDB)に固定。フォルダ管理はプロジェクト単位で行う。 */
   storage.useIdb();
