@@ -3155,6 +3155,7 @@ function openReel(){
    +'.stage .empty{color:#5a5a6a;text-align:center;line-height:1.9}'
    +'.ctr{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#141416;border-top:1px solid #2a2a2f}'
    +'.ctr .time{font-family:monospace;font-size:12px;color:#9a9aaa;min-width:110px}'
+   +'.ctr .zlab{font-family:monospace;font-size:12px;color:#9a9aaa;text-align:center}'
    +'.tlwrap{background:#141416;border-top:1px solid #2a2a2f;padding:8px 14px 12px;overflow-x:auto;flex-shrink:0}'
    +'.ruler{position:relative;height:18px;margin-bottom:4px}'
    +'.track{display:flex;gap:2px;position:relative;min-height:64px}'
@@ -3317,7 +3318,7 @@ function openReel(){
   const layB=mkB('▤ レイヤー','レイヤーバーの表示/非表示（ドリル）');layB.classList.add('on');
   /* ズーム/トラック（レビューページと同じ） */
   const ziBtn=mkB('🔍+','ズームイン（ホイールでも可）'),zoBtn=mkB('🔍−','ズームアウト');
-  const zoomLab=ce(d,'span','time','100%');zoomLab.style.minWidth='46px';
+  const zoomLab=ce(d,'span','zlab','100%');zoomLab.style.minWidth='46px';
   const zrBtn=mkB('等倍','ズームリセット'),handB=mkB('✋ トラック','ドラッグで表示位置を移動（中ボタンドラッグでも可）');
   /* 描画ツールは動画の上側、フレーム操作は下側 */
   const fbarTop=ce(d,'div','ctr');fbarTop.style.cssText='border-top:none;border-bottom:1px solid rgba(96,165,255,.7)';
@@ -3345,7 +3346,7 @@ function openReel(){
 
   const rvData=()=>{const c=reelUI.clips[reelUI.cur];if(!c||!c.nodeId)return null;const n=getNode(c.nodeId);const vv=n&&n.versions.find(x=>x.id===c.vId);return vv?{node:n,v:vv}:null};
   const vOf=c=>{if(!c||!c.nodeId)return null;const n=getNode(c.nodeId);return (n&&n.versions.find(x=>x.id===c.vId))||null};
-  const clipFPS=c=>{const vv=vOf(c);return vv?(vv.fps||24):24};
+  const clipFPS=c=>{if(c&&c.fps)return c.fps;const vv=vOf(c);return vv?(vv.fps||24):24};
   const clipFrames=c=>Math.max(1,Math.round((c.dur||0)*clipFPS(c)));
   const gOffset=idx=>{let s=0;for(let i=0;i<idx;i++)s+=clipFrames(reelUI.clips[i]);return s};
   const gTotal=()=>Math.max(1,reelUI.clips.reduce((a,c)=>a+clipFrames(c),0));
@@ -3402,7 +3403,7 @@ function openReel(){
     const dt=rvData();clist.innerHTML='';
     if(!dt){clist.appendChild(ce(d,'div','log-empty-note','クリップ未選択'));return}
     if(!dt.v.review.notes.length)clist.appendChild(ce(d,'div','log-empty-note','コメントはまだありません。'));
-    const refresh=async()=>{await persist();reelNotes();drawAnno();drawFTL();try{render();resolveThumbs()}catch(_){}};
+    const refresh=async()=>{await persist();reelNotes();drawAnno();drawFTL()};
     const shot={fileRef:dt.v.file,fps:dt.v.fps||24,isVideo:true};
     for(const n of dt.v.review.notes)clist.appendChild(noteBlock(dt.v,n,{refresh,onSeek:f=>{video.pause();seekRTr(f)},shot}));
     clist.scrollTop=clist.scrollHeight;
@@ -3448,10 +3449,14 @@ function openReel(){
   traceB.onclick=()=>{rTraceOp=(rTraceOp+25)%125;trace.style.opacity=rTraceOp/100;traceB.textContent='トレペ '+rTraceOp+'%'};
   function applyRZoom(){ztrans.style.transform='translate('+RZ.x+'px,'+RZ.y+'px) scale('+RZ.s+')';zoomLab.textContent=Math.round(RZ.s*100)+'%'}
   function rZoomTo(ns,cx,cy){const st=stage.getBoundingClientRect();if(cx==null)cx=st.width/2;if(cy==null)cy=st.height/2;ns=Math.max(1,Math.min(8,ns));const k=ns/RZ.s;RZ.x=cx-k*(cx-RZ.x);RZ.y=cy-k*(cy-RZ.y);RZ.s=ns;if(RZ.s===1){RZ.x=0;RZ.y=0}applyRZoom()}
+  /* ズーム/トラックのリセット（クリップ切替時） */
+  function resetRZoom(){RZ.s=1;RZ.x=0;RZ.y=0;RZ.hand=false;RZ.panning=false;handB.classList.remove('on');stage.style.cursor='';applyRZoom()}
+  /* 表示状態（ズーム＋トレペ＋ゴースト）のリセット（新規/リールを開く時） */
+  function resetView(){resetRZoom();rGhost=false;ghostB.classList.remove('on');rTraceOp=0;trace.style.opacity=0;traceB.textContent='トレペ 0%'}
   ziBtn.onclick=()=>rZoomTo(RZ.s*1.4);zoBtn.onclick=()=>rZoomTo(RZ.s/1.4);zrBtn.onclick=()=>rZoomTo(1);
   handB.onclick=()=>{RZ.hand=!RZ.hand;handB.classList.toggle('on',RZ.hand);if(RZ.hand)setRTool(null);stage.style.cursor=RZ.hand?'grab':''};
   stage.addEventListener('wheel',e=>{e.preventDefault();const r=stage.getBoundingClientRect();rZoomTo(RZ.s*(e.deltaY<0?1.15:1/1.15),e.clientX-r.left,e.clientY-r.top)},{passive:false});
-  stage.addEventListener('pointerdown',e=>{if(!(RZ.hand||e.button===1))return;RZ.panning=true;RZ.px=e.clientX;RZ.py=e.clientY;stage.style.cursor='grabbing';e.preventDefault()});
+  stage.addEventListener('pointerdown',e=>{if(!(RZ.hand||e.button===1))return;if(RZ.s<=1)return;RZ.panning=true;RZ.px=e.clientX;RZ.py=e.clientY;stage.style.cursor='grabbing';e.preventDefault()});
   stage.addEventListener('pointermove',e=>{if(!RZ.panning)return;RZ.x+=e.clientX-RZ.px;RZ.y+=e.clientY-RZ.py;RZ.px=e.clientX;RZ.py=e.clientY;applyRZoom()});
   stage.addEventListener('pointerup',()=>{RZ.panning=false;stage.style.cursor=RZ.hand?'grab':''});
   /* タイムライン：全クリップ（全体フレーム）＋各動画のフレーム目盛り */
@@ -3535,14 +3540,15 @@ function openReel(){
   const szRing=ce(d,'div','sz-ring');szRing.style.cssText='position:absolute;border:2px solid rgba(255,255,255,.9);border-radius:50%;pointer-events:none;z-index:9;box-shadow:0 0 0 1px rgba(0,0,0,.6);transform:translate(-50%,-50%);display:none';stage.appendChild(szRing);
   let rvSz=null;
   function liveOpt(sel,val,prefix){let o=[...sel.options].find(x=>x.dataset.live);if(!o){o=d.createElement('option');o.dataset.live='1';sel.appendChild(o)}const rv=Math.round(val);o.value=String(rv);o.textContent=prefix+rv+'px';sel.value=o.value}
-  function rvShowRing(){const sz=(rvSz.tool==='erase'?RV.eraseW:RV.brushW);szRing.style.display='block';szRing.style.left=rvSz.rl+'px';szRing.style.top=rvSz.rt+'px';szRing.style.width=sz+'px';szRing.style.height=sz+'px'}
+  function rvShowRing(){const sz=(rvSz.tool==='erase'?RV.eraseW:RV.brushW)*RZ.s;szRing.style.display='block';szRing.style.left=rvSz.rl+'px';szRing.style.top=rvSz.rt+'px';szRing.style.width=sz+'px';szRing.style.height=sz+'px'}
   anno.addEventListener('contextmenu',e=>{if(e.altKey)e.preventDefault()});
   anno.addEventListener('pointerdown',e=>{if(e.button!==2||!e.altKey||!RV.tool)return;e.preventDefault();anno.setPointerCapture(e.pointerId);const r=stage.getBoundingClientRect();rvSz={x:e.clientX,rl:e.clientX-r.left,rt:e.clientY-r.top,start:RV.tool==='erase'?RV.eraseW:RV.brushW,tool:RV.tool};rvShowRing()});
   anno.addEventListener('pointermove',e=>{if(!rvSz)return;const ns=Math.max(1,Math.min(200,rvSz.start+(e.clientX-rvSz.x)*0.4));if(rvSz.tool==='erase'){RV.eraseW=ns;liveOpt(eraseS,ns,'消し ')}else{RV.brushW=ns;liveOpt(brushS,ns,'ブラシ ')}drawAnno();rvShowRing()});
   anno.addEventListener('pointerup',()=>{if(rvSz){rvSz=null;szRing.style.display='none'}});
   pF.onclick=()=>{video.pause();seekRTr(dispF()-1)};
   nF.onclick=()=>{video.pause();seekRTr(dispF()+1)};
-  fpsS.onchange=async()=>{RV.FPS=parseInt(fpsS.value)||24;const dt=rvData();if(dt){dt.v.fps=RV.FPS;await persist()}RV.total=Math.max(1,Math.round((video.duration||0)*RV.FPS));RV.last=-1;drawFTL()};
+  /* fps変更はこのリールのセッション内だけ（元動画データ v.fps は書き換えない） */
+  fpsS.onchange=()=>{RV.FPS=parseInt(fpsS.value)||24;const c=reelUI.clips[reelUI.cur];if(c)c.fps=RV.FPS;RV.total=Math.max(1,Math.round((video.duration||0)*RV.FPS));RV.last=-1;drawFTL()};
   durS.onchange=()=>{drawAnno();drawFTL()};
   eyeB.onclick=()=>{RV.eye=!RV.eye;eyeB.classList.toggle('on',RV.eye);drawAnno()};
   undoB.onclick=()=>{RV.pending.pop();drawAnno();drawFTL()};
@@ -3578,7 +3584,8 @@ function openReel(){
     /* クリップ切替：未送信アノテはクリップごとに保持（跨いでも消えない） */
     RV.pending=(c&&(c.pending||(c.pending=[])))||[];
     RV.stroke=null;RV.last=-1;RV.layerCount=1;
-    const dt=rvData();RV.FPS=dt?(dt.v.fps||24):24;fpsS.value=String(RV.FPS);
+    resetRZoom(); /* クリップ切替時はズーム/トラックをリセット */
+    const dt=rvData();RV.FPS=(c&&c.fps)||(dt&&dt.v.fps)||24;fpsS.value=String(RV.FPS);
     buildLayerPanel();reelNotes();
     if(!c){video.removeAttribute('src');video.load();reelRender();return}
     video.src=c.url;if(auto)video.play().catch(()=>{});
@@ -3589,12 +3596,12 @@ function openReel(){
   prev.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.max(0,reelUI.cur-1);loadCur(true)};
   next.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.min(cs().length-1,reelUI.cur+1);loadCur(true)};
   loopBtn.onclick=()=>{reelUI.loop=!reelUI.loop;loopBtn.classList.toggle('on',reelUI.loop)};
-  clearBtn.onclick=()=>{if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;video.pause();video.removeAttribute('src');video.load();reelRender();updReelTitle()};
+  clearBtn.onclick=()=>{if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();updReelTitle()};
   /* ==== File メニュー（新規 / 開く / 保存 / 名前を付けて保存）— AE/Maya風 ==== */
   function updReelTitle(){const r=reelUI.reelId?DB.reels.find(x=>x.id===reelUI.reelId):null;reelTitle.textContent=(r?r.name:'未保存のリール')+(reelUI.clips.length?'':'（空）')}
   function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
   function closeOpenOv(){const ov=d.getElementById('reelOpenOv');if(ov)ov.remove()}
-  function doNew(){reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();reelRender();updReelTitle()}
+  function doNew(){reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();updReelTitle()}
   async function doSave(forceNew){
     const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
     if(!clips.length){reelWin.alert('保存するクリップがありません');return}
@@ -3608,10 +3615,12 @@ function openReel(){
   }
   async function openReelHere(reelId){
     const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
-    reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;video.pause();video.removeAttribute('src');video.load();reelRender();
-    for(const ref of (r.clips||[])){const n=getNode(ref.nodeId);const vv=n&&n.versions.find(x=>x.id===ref.vId);if(n&&vv)await reelAddClip(n,vv)}
+    reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();
+    let miss=0;
+    for(const ref of (r.clips||[])){const n=getNode(ref.nodeId);const vv=n&&n.versions.find(x=>x.id===ref.vId);if(n&&vv)await reelAddClip(n,vv,true);else miss++}
     if(reelUI.loadCur)reelUI.loadCur(false);
     reelRender();updReelTitle();
+    if(miss)reelWin.alert(miss+' 件のクリップを読み込めませんでした（動画が削除されたか、プロジェクトが未接続の可能性があります）');
   }
   function doOpen(){
     closeMenu();closeOpenOv();
@@ -3746,16 +3755,20 @@ function reelRender(){
   if(reelUI.drawFTL)reelUI.drawFTL();
 }
 
-async function reelAddClip(node,v){
+async function reelAddClip(node,v,noDedup){
   if(!reelAlive())return;
   if(v.type!=='video')return;
+  /* 同じ動画（同ノード・同バージョン）の重複追加を防ぐ（保存リールの復元時は noDedup で許可） */
+  if(!noDedup&&reelUI.clips.some(c=>c.nodeId===node.id&&c.vId===v.id)){reelWin.focus();return}
   const url=await storage.getURL(v.file);if(!url)return;
   const clip={name:node.name+' '+v.name,url,dur:0,nodeId:node.id,vId:v.id};
   reelUI.clips.push(clip);
   if(reelUI.clips.length===1&&reelUI.loadCur)reelUI.loadCur(false); // 最初のクリップは即ロード
-  /* 尺の取得（全体フレーム計算にも使用） */
+  /* 尺の取得（全体フレーム計算にも使用）。取得後は probe を破棄 */
   const probe=reelUI.d.createElement('video');probe.preload='metadata';probe.src=url;
-  probe.onloadedmetadata=()=>{clip.dur=probe.duration||0;reelRender()};
+  const cleanup=()=>{probe.onloadedmetadata=null;probe.onerror=null;try{probe.removeAttribute('src');probe.load()}catch(_){}};
+  probe.onloadedmetadata=()=>{clip.dur=probe.duration||0;cleanup();reelRender();if(reelUI.drawFTL)reelUI.drawFTL()};
+  probe.onerror=cleanup;
   reelRender();
 }
 async function sendToReel(node,v){
