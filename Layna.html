@@ -3406,6 +3406,9 @@ function openReel(){
    /* コメントパネル（FBと同じ挙動・noteBlock共用） */
    +'.fb-side{width:320px;border-left:1px solid rgba(96,165,255,.5);box-shadow:-1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.fb-side-head{font-size:10px;font-weight:700;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:12px 14px 8px}'
+   +'.reel-status{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 12px 10px;margin-bottom:6px;border-bottom:1px solid #2a2a2f}'
+   +'.reel-status .rs-lab{width:100%;font-size:11px;color:#9a9aaa;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.reel-status .btn{padding:4px 9px;font-size:11px}'
    +'.fb-notes{flex:1;overflow-y:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}'
    +'.fb-input{padding:12px;border-top:1px solid #2a2a2f;display:flex;gap:8px}'
    +'.fb-input textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;padding:8px 10px;background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;color:#e8e8ec;font-size:13px;line-height:1.5;font-family:inherit}'
@@ -3531,6 +3534,25 @@ function openReel(){
   /* コメントパネル（FBと同じ・noteBlock共用） */
   const cside=ce(d,'div','fb-side');
   cside.appendChild(ce(d,'div','fb-side-head','コメント / FB'));
+  /* 現在のクリップ（ショットの工程）のステータスをボタンで変更（レビューのアノテ画面と同じ形式） */
+  const statusBar=ce(d,'div','reel-status');cside.appendChild(statusBar);
+  function updReelStatus(){
+    statusBar.innerHTML='';
+    const c=reelUI.clips[reelUI.cur];const n=c&&c.nodeId?getNode(c.nodeId):null;
+    if(!n){statusBar.style.display='none';return}
+    statusBar.style.display='';
+    const shot=n.parentId?getNode(n.parentId):null;
+    statusBar.appendChild(ce(d,'span','rs-lab',(shot?shot.name+' / ':'')+n.name));
+    const cur=nodeStatus(n);
+    for(const stt of projStatuses(n)){
+      const b=ce(d,'button','btn',stt.label);
+      b.style.borderColor=stt.color;b.style.color=stt.color;
+      if(cur===stt.id)b.style.background=hexA(stt.color,.22);
+      b.onclick=async()=>{n.status=stt.id;await persist();updReelStatus();try{render();resolveThumbs()}catch(_){}try{reelRender()}catch(_){}};
+      statusBar.appendChild(b);
+    }
+  }
+  reelUI.updStatus=updReelStatus;
   const clist=ce(d,'div','fb-notes');cside.appendChild(clist);
   const ciw=ce(d,'div','fb-input');
   const cta=d.createElement('textarea');cta.placeholder='このフレームにコメント…（Shift+Enterで改行）';
@@ -3836,7 +3858,7 @@ function openReel(){
     cta.value=(c&&c.commentDraft)||''; /* コメント下書きはカットごとに保持 */
     resetRZoom(); /* クリップ切替時はズーム/トラックをリセット */
     const dt=rvData();RV.FPS=(c&&c.fps)||(dt&&dt.v.fps)||24;fpsS.value=String(RV.FPS);
-    buildLayerPanel();reelNotes();updUnsent();
+    buildLayerPanel();reelNotes();updUnsent();updReelStatus();
     if(!c){hideBridge();video.removeAttribute('src');video.load();try{vNext.removeAttribute('src');vNext.load()}catch(_){}reelRender();return}
     if(video.getAttribute('src')===c.url){
       /* 既に表示中のクリップ：必要なときだけ先頭へ戻す（不要なシークはしない） */
