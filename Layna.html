@@ -3520,10 +3520,15 @@ function openReel(){
   /* プレビュー（ズーム/トラック用ラッパー：動画・トレペ・キャンバスをまとめて変形） */
   const stage=ce(d,'div','stage');
   const ztrans=ce(d,'div','ztrans');stage.appendChild(ztrans);
-  /* 二重バッファ：再生中の裏で次クリップを先読みし、クリップ切替を瞬時にする（遅延なし） */
-  const mkVid=()=>{const v=ce(d,'video');v.controls=false;v.playsInline=true;v.preload='auto';v.style.opacity='0';ztrans.appendChild(v);return v};
-  let video=mkVid();video.style.opacity='1';
-  let vNext=mkVid();
+  /* クリップごとに専用の video 要素をプール（キャッシュ）する。一度読み込んだクリップは
+     デコード済み・先頭フレームで待機した状態で保持されるため、クリップを跨ぐ切替・ループ・
+     巻き戻しのいずれも遅延なし（黒フレームなし）で表示できる。 */
+  const mkVid=()=>{const v=ce(d,'video');v.controls=false;v.playsInline=true;v.preload='auto';v.style.opacity='0';ztrans.appendChild(v);attachVid(v);return v};
+  const POOL_MAX=16;                 /* 保持する最大クリップ数（超過は最古を破棄） */
+  const vpool=new Map();             /* url -> {el, used} */
+  let poolClock=0;
+  const idleVid=mkVid();idleVid.style.opacity='1'; /* クリップ未読込時の待機要素 */
+  let video=idleVid;
   const trace=ce(d,'div','rtrace');ztrans.appendChild(trace); // トラッキングペーパー（白レイヤー）
   /* クリップ切替時の黒フレーム点滅を防ぐ橋渡し用キャンバス（直前フレームを保持） */
   const bridge=ce(d,'canvas');bridge.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:3;display:none;pointer-events:none';stage.appendChild(bridge);
@@ -3907,23 +3912,49 @@ function openReel(){
   const cs=()=>reelUI.clips;
   const sumPrev=i=>cs().slice(0,i).reduce((a,c)=>a+(c.dur||0),0);
   const total=()=>cs().reduce((a,c)=>a+(c.dur||0),0);
-  /* 裏バッファに次クリップを先読み（切替を瞬時にするためのキャッシュ）
-     隠し要素はブラウザがデコードを後回しにするため、ミュート再生→即停止で
-     先頭フレームまで確実にデコードさせておく */
-  /* 隠しバッファへ微小シークして先頭フレームをデコードさせる（再生はしないので
-     音も鳴らず ended も発火しない）。切替時はこのフレームがそのまま瞬時に表示される。 */
-  function warmBuffer(vd){try{if(vd.readyState<2&&isFinite(vd.duration)&&vd.duration>0.1)vd.currentTime=Math.min(0.03,vd.duration*0.1)}catch(_){}}
-  function preloadNext(){
-    const nx=cs()[reelUI.cur+1];
-    if(nx&&nx.url){
-      if(vNext.getAttribute('src')!==nx.url){
-        const target=vNext;target.muted=true;target.src=nx.url;try{target.load()}catch(_){}
-        if(target.readyState>=1)warmBuffer(target);else target.addEventListener('loadedmetadata',()=>warmBuffer(target),{once:true});
-      }
-    }else{try{vNext.removeAttribute('src');vNext.load()}catch(_){}}
+  /* クリップを読み込んだら先頭付近を一度デコードさせ、そのうえで 0 に戻して
+     「デコード済み・先頭フレームで待機」の状態にする。表示に切り替えた瞬間に
+     再シーク（＝黒フレーム/カクつき）が発生しないためのウォームアップ。 */
+  function warmRest(v){
+    const force=()=>{try{if(isFinite(v.duration)&&v.duration>0.05&&v.readyState<2)v.currentTime=Math.min(0.04,v.duration*0.1)}catch(_){}};
+    if(v.readyState>=1)force();else v.addEventListener('loadedmetadata',force,{once:true});
+    v.addEventListener('seeked',function h(){v.removeEventListener('seeked',h);if((v.currentTime||0)>0.001){try{v.currentTime=0}catch(_){}}});
   }
-  /* 表示バッファと裏バッファを入替（先読み済みなので遅延なし） */
-  function swapVids(){const t=video;video=vNext;vNext=t;video.muted=false;video.style.opacity='1';vNext.style.opacity='0';try{vNext.pause()}catch(_){}reelUI.video=video;}
+  /* url に対応する（キャッシュ済みの）video 要素を返す。無ければ生成してプールに登録。 */
+  function getVid(url){
+    const e=vpool.get(url);
+    if(e){e.used=++poolClock;return e.el}
+    const v=mkVid();v.muted=true;v.src=url;try{v.load()}catch(_){}
+    warmRest(v);
+    vpool.set(url,{el:v,used:++poolClock});
+    evictPool(url);
+    return v;
+  }
+  /* プールが上限を超えたら、現在／次クリップ以外で最も古いものから破棄 */
+  function evictPool(keepUrl){
+    if(vpool.size<=POOL_MAX)return;
+    const cur=cs()[reelUI.cur],nx=cs()[reelUI.cur+1];
+    const keep=new Set([keepUrl,(video&&video.getAttribute&&video.getAttribute('src'))||null,cur&&cur.url,nx&&nx.url]);
+    const ents=[...vpool.entries()].filter(([u])=>!keep.has(u)).sort((a,b)=>a[1].used-b[1].used);
+    while(vpool.size>POOL_MAX&&ents.length){const[u,o]=ents.shift();try{o.el.pause();o.el.removeAttribute('src');o.el.load();o.el.remove()}catch(_){}vpool.delete(u)}
+  }
+  /* 次クリップを（表示せず裏で）キャッシュに用意しておく */
+  function preloadNext(){const nx=cs()[reelUI.cur+1];if(nx&&nx.url)getVid(nx.url)}
+  /* 指定要素を表示中（アクティブ）にする。旧要素は隠してミュート。 */
+  function activate(v){
+    if(video===v)return;
+    const old=video;
+    try{old.pause()}catch(_){}
+    old.style.opacity='0';try{old.muted=true}catch(_){}
+    video=v;reelUI.video=video;
+    try{video.muted=false}catch(_){}video.style.opacity='1';
+  }
+  /* プール全破棄（クリア／新規／別リールを開く時） */
+  function clearPool(){
+    for(const{el}of vpool.values()){try{el.pause();el.removeAttribute('src');el.load();el.remove()}catch(_){}}
+    vpool.clear();activate(idleVid);
+  }
+  reelUI.clearPool=clearPool;
   function loadCur(auto){
     const c=cs()[reelUI.cur];
     reelUI.ended=false; /* 新しいクリップを読み込むので終端フラグ解除 */
@@ -3934,25 +3965,24 @@ function openReel(){
     resetRZoom(); /* クリップ切替時はズーム/トラックをリセット */
     const dt=rvData();RV.FPS=(c&&c.fps)||(dt&&dt.v.fps)||24;fpsS.value=String(RV.FPS);
     buildLayerPanel();reelNotes();updUnsent();updReelStatus();
-    if(!c){hideBridge();video.removeAttribute('src');video.load();try{vNext.removeAttribute('src');vNext.load()}catch(_){}reelRender();return}
-    if(video.getAttribute('src')===c.url){
-      /* 既に表示中のクリップ：必要なときだけ先頭へ戻す（不要なシークはしない） */
+    if(!c){hideBridge();activate(idleVid);reelRender();return}
+    const target=getVid(c.url); /* キャッシュ済みなら即・デコード済みで先頭待機 */
+    if(target===video){
+      /* 既に表示中：必要なときだけ先頭へ戻す */
       hideBridge();if(video.currentTime>0.02){try{video.currentTime=0}catch(_){}}
       if(auto)video.play().catch(()=>{});
-    } else if(vNext.getAttribute('src')===c.url&&vNext.readyState>=2){
-      /* 先読み済み：バッファを瞬時に入替（遅延なし・黒点滅なし）
-         先読み時に先頭へ巻き戻し済みなので不要なシークはしない（readyState低下を防ぐ） */
-      hideBridge();swapVids();if(video.currentTime>0.02){try{video.currentTime=0}catch(_){}}
+    }else{
+      /* 未デコードの新規クリップのみ、差替え中の黒点滅を直前フレームで隠す
+         （キャッシュ済み＝readyState>=2 なら橋渡し不要で瞬時に表示） */
+      if(target.readyState<2&&video.videoWidth>0&&video.readyState>=2){
+        try{bridge.width=video.videoWidth;bridge.height=video.videoHeight;bridge.getContext('2d').drawImage(video,0,0);bridge.style.display='block';reelWin.clearTimeout(reelUI.bridgeTO);reelUI.bridgeTO=reelWin.setTimeout(hideBridge,900)}catch(_){hideBridge()}
+      }else hideBridge();
+      activate(target);
+      if(video.currentTime>0.02){try{video.currentTime=0}catch(_){}}
       RV.total=Math.max(1,Math.round((video.duration||0)*RV.FPS));fitAnno();RV.last=-1;
       if(auto)video.play().catch(()=>{});else video.pause();
-    } else {
-      /* 未読込：直前フレームを橋渡しキャンバスに描いて src 差替え中の黒点滅を隠す */
-      if(video.videoWidth>0&&video.readyState>=2){
-        try{bridge.width=video.videoWidth;bridge.height=video.videoHeight;bridge.getContext('2d').drawImage(video,0,0);bridge.style.display='block';reelWin.clearTimeout(reelUI.bridgeTO);reelUI.bridgeTO=reelWin.setTimeout(hideBridge,900)}catch(_){hideBridge()}
-      }
-      video.muted=false;video.src=c.url;if(auto)video.play().catch(()=>{});
     }
-    preloadNext(); /* 次クリップを裏で先読み */
+    preloadNext(); /* 次クリップを裏でキャッシュ */
     reelRender();
   }
   reelUI.loadCur=loadCur;
@@ -3961,12 +3991,12 @@ function openReel(){
   prev.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.max(0,reelUI.cur-1);loadCur(true)};
   next.onclick=()=>{if(!cs().length)return;reelUI.cur=Math.min(cs().length-1,reelUI.cur+1);loadCur(true)};
   loopBtn.onclick=()=>{reelUI.loop=!reelUI.loop;loopBtn.classList.toggle('on',reelUI.loop)};
-  clearBtn.onclick=()=>{if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。すべてのクリップを外すと失われます。続けますか？')){return}if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;video.pause();video.removeAttribute('src');video.load();try{vNext.removeAttribute('src');vNext.load()}catch(_){}resetView();reelRender();updReelTitle();updUnsent()};
+  clearBtn.onclick=()=>{if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。すべてのクリップを外すと失われます。続けますか？')){return}if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;clearPool();resetView();reelRender();updReelTitle();updUnsent()};
   /* ==== File メニュー（新規 / 開く / 保存 / 名前を付けて保存）— AE/Maya風 ==== */
   function updReelTitle(){const r=reelUI.reelId?DB.reels.find(x=>x.id===reelUI.reelId):null;reelTitle.textContent=(r?r.name:'未保存のリール')+(reelUI.clips.length?'':'（空）')}
   function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
   function closeOpenOv(){const ov=d.getElementById('reelOpenOv');if(ov)ov.remove()}
-  function doNew(){if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。新規リールを作ると失われます。続けますか？'))return;reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;video.pause();video.removeAttribute('src');video.load();try{vNext.removeAttribute('src');vNext.load()}catch(_){}resetView();reelRender();updReelTitle();updUnsent()}
+  function doNew(){if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。新規リールを作ると失われます。続けますか？'))return;reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;clearPool();resetView();reelRender();updReelTitle();updUnsent()}
   /* リール保存（File メニュー / Ctrl+S から）。ヘッダのボタンは廃止済み */
   async function doSave(forceNew){
     const clips=reelUI.clips.filter(c=>c.nodeId).map(c=>({nodeId:c.nodeId,vId:c.vId}));
@@ -3982,7 +4012,7 @@ function openReel(){
   async function openReelHere(reelId){
     const r=DB.reels.find(x=>x.id===reelId);if(!r)return;
     if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。別のリールを開くと失われます。続けますか？'))return;
-    reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;video.pause();video.removeAttribute('src');video.load();resetView();reelRender();
+    reelUI.clips=[];reelUI.cur=0;reelUI.reelId=reelId;clearPool();resetView();reelRender();
     let miss=0;
     for(const ref of (r.clips||[])){const n=getNode(ref.nodeId);const vv=n&&n.versions.find(x=>x.id===ref.vId);if(n&&vv)await reelAddClip(n,vv,true);else miss++}
     if(reelUI.loadCur)reelUI.loadCur(false);
@@ -4032,7 +4062,8 @@ function openReel(){
   updReelTitle();
   /* 二重バッファの両方にリスナーを付け、アクティブ側のイベントだけ処理する
      （裏バッファの先読みで発火するイベントは e.target!==video で無視） */
-  [video,vNext].forEach(vd=>{
+  /* プール内の各 video 要素にイベントを配線（アクティブ要素のみ処理） */
+  function attachVid(vd){
     vd.addEventListener('seeked',e=>{if(e.target!==video)return;clearTimeout(RV.guard);RV.busy=false;if(RV.pend>=0){const p=RV.pend;RV.pend=-1;seekRTr(p)}});
     vd.addEventListener('loadedmetadata',e=>{if(e.target!==video)return;RV.total=Math.max(1,Math.round((video.duration||0)*RV.FPS));fitAnno();RV.last=-1;if(RV.pendSeek!=null){const f=RV.pendSeek;RV.pendSeek=null;seekRTr(f)}});
     vd.addEventListener('play',e=>{if(e.target!==video)return;play.textContent='⏸ 停止'});
@@ -4046,7 +4077,7 @@ function openReel(){
     /* 新しいクリップの先頭フレームが表示可能になったら橋渡しキャンバスを消す */
     vd.addEventListener('loadeddata',e=>{if(e.target===video)hideBridge()});
     vd.addEventListener('playing',e=>{if(e.target===video)hideBridge()});
-  });
+  }
   /* プレイヘッド更新 */
   (function tick(){
     if(!reelAlive())return;
