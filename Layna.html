@@ -2085,8 +2085,8 @@ function noteBlock(v,n,opts){
   acts.appendChild(ed);acts.appendChild(del);m.appendChild(acts);
   const t=el('div','t',n.text);
   note.appendChild(m);note.appendChild(t);
-  /* アノテーション付きフレームのスクショをコメントに表示 */
-  if(opts.shot&&opts.shot.isVideo&&n.drawing&&n.drawing.length){
+  /* アノテーション付きフレームのスクショをコメントに表示（noShot＝記入せず送信した描画のみは省略） */
+  if(opts.shot&&opts.shot.isVideo&&n.drawing&&n.drawing.length&&!n.noShot){
     const cv=el('canvas','note-shot');cv.width=16;cv.height=9;cv.title='F'+(n.frame||0)+' のアノテーション';
     if(opts.onSeek&&n.frame!=null)cv.onclick=()=>opts.onSeek(n.frame);
     note.appendChild(cv);
@@ -3866,8 +3866,11 @@ function openReel(){
     return notes;
   }
   /* 記入：現在クリップの pending＋コメントを下書き(c.drafts)へ。まだレビューには反映しない */
-  function reelRecord(c,curFrame){
+  function reelRecord(c,curFrame,noShot){
     const notes=buildNotes(c,curFrame);if(!notes.length)return 0;
+    /* 記入せず送信した「描画のみ」ノートはスクショを取らない（パラパラ漫画で大量に溜まるのを防ぐ）。
+       コメント付き・明示的に記入したものはスクショを残す。 */
+    if(noShot)for(const n of notes)if(n.drawing&&n.drawing.length&&n.text==='（描画のみ）')n.noShot=true;
     (c.drafts=c.drafts||[]).push(...notes);
     if(c.pending)c.pending.length=0;c.commentDraft='';
     return notes.length;
@@ -3888,7 +3891,7 @@ function openReel(){
     const cc=reelUI.clips[reelUI.cur];if(cc)cc.commentDraft=cta.value; /* 入力途中のコメントも取り込む */
     let total=0;
     for(const c of reelUI.clips){
-      reelRecord(c,c===cc?dispF():null); /* 未記入の pending＋コメントをこのカットの下書きへ */
+      reelRecord(c,c===cc?dispF():null,true); /* 未記入の pending＋コメントをこのカットの下書きへ（描画のみはスクショ省略） */
       if(!c.drafts||!c.drafts.length)continue;const vv=vOf(c);if(!vv)continue;
       for(const n of c.drafts)vv.review.notes.push(n);
       total+=c.drafts.length;c.drafts=[];
