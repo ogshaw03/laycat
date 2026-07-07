@@ -616,7 +616,7 @@ textarea.form-input{height:70px;resize:vertical}
   </main>
 </div>
 <div class="modal-overlay hidden" id="modal"><div class="modal" id="modalBody"></div></div>
-<div class="drop-overlay hidden" id="dropOverlay"><div class="dz"><span class="big">◐</span>ここにドロップしてアップロード<br><small>動画・画像ファイル（複数可）— このタスクのログに追加されます</small></div></div>
+<div class="drop-overlay hidden" id="dropOverlay"><div class="dz"><span class="big">◐</span>ここにドロップしてアップロード<br><small>動画・画像ファイル（複数可）— このタスクページのログに追加されます</small></div></div>
 
 <script>
 'use strict';
@@ -1125,8 +1125,8 @@ async function createSubmitBlock(){
     const v=b.node.versions[b.node.versions.length-1];
     if(v&&b.node.versions.length>before){
       v.submitId=subId;v.submitName=name; /* タイムラインでまとめて表示するため */
-      /* サブミットブロックへのコメントを各ショットのレビューページにも反映（ショット個別コメントとは別扱い） */
-      if(blockComment)v.review.notes.push({author:currentUser(),text:blockComment,time:nowIso(),kind:'submit',submitName:name});
+      /* サブミットブロックのコメントは各ショットの「メッセージ」（node.comments）として反映 */
+      if(blockComment)(b.node.comments=b.node.comments||[]).push({id:newId('sc'),author:currentUser(),text:blockComment,time:nowIso(),kind:'submit',submitName:name});
       items.push({nodeId:b.node.id,versionId:v.id,comment:b.comment||''});
       /* このショット工程のステータスを反映 */
       if(b.status)b.node.status=b.status;
@@ -1538,7 +1538,7 @@ function renderProjTimeline(main,cur){
   for(const e of evs){
     if(e.type==='submit'){tl.appendChild(tlSubmitItem(e,cur));continue}
     /* ショットの枠全体をクリックで該当ショットへ移動 */
-    const it=el('div','tl-item');it.onclick=()=>openReviewDrawer(e.node.id);it.title='クリックでタスクを右側に表示';
+    const it=el('div','tl-item');it.onclick=()=>openReviewDrawer(e.node.id);it.title='クリックでタスクページを右側に表示';
     const th=el('img','tl-thumb');if(e.v.thumb)th.dataset.ref=e.v.thumb;
     it.appendChild(th);
     const bd=el('div','tl-body');
@@ -1938,7 +1938,7 @@ function fillReviewDrawer(){
   const shot=(state.drawer.shotId&&getNode(state.drawer.shotId))||(node.parentId?getNode(node.parentId):null);
   const strip=buildStageStrip(shot,node.id);if(strip)back._acts.appendChild(strip);
   if(node.versions.length)back._acts.appendChild(buildStatusSelect(node)); /* ステータス切替プルダウン */
-  const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.title='このタスクを通常表示で開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
+  const openB=el('button','btn btn-ghost btn-sm','ページで開く');openB.title='このタスクページを通常表示で開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
   back._body.innerHTML='';curUploadUI=null;
   renderReviewBody(back._body,node);
   resolveThumbs();
@@ -2215,28 +2215,12 @@ function logItem(node,v){
   }
   const detail=el('button','btn btn-ghost btn-sm','チェック / 詳細');detail.onclick=()=>openReview(node.id,v.id);head.appendChild(detail);
   it.appendChild(head);
-  // 動画左（＋ショット全体コメント）・フレームコメント右のレイアウト
+  // 動画左・フレームコメント右のレイアウト（ショット全体へのコメントは廃止＝メッセージ機能を使用）
   const flexw=el('div','log-flex');
   const left=el('div','log-left');left.appendChild(media);flexw.appendChild(left);
   const refresh=async()=>{await persist();renderBody();resolveThumbs()};
   const seekInline=v.type==='video'?f=>{const vd=media.querySelector('video');if(vd){vd.pause();vd.currentTime=f/(v.fps||24)+0.0001}}:null;
   const shot={fileRef:v.file,fps:v.fps||24,isVideo:v.type==='video'};
-  const mkInput=(ph,frameFn)=>{
-    const iw=el('div','log-note-input');
-    const ta=el('textarea');ta.placeholder=ph;
-    const sb=el('button','btn btn-primary btn-sm','送信');
-    const send=async()=>{const txt=ta.value.trim();if(!txt)return;const n={author:currentUser(),text:txt,time:nowIso()};const fr=frameFn?frameFn():null;if(fr!=null)n.frame=fr;v.review.notes.push(n);await persist();renderBody();resolveThumbs()};
-    sb.onclick=send;ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}};
-    iw.appendChild(ta);iw.appendChild(sb);return iw;
-  };
-  /* ショット全体へのコメント（frameなし）→ 動画の下 */
-  const gen=el('div','log-gen');
-  gen.appendChild(el('div','log-gen-head','ショット全体へのコメント'));
-  const genNotes=v.review.notes.filter(n=>n.frame==null);
-  if(!genNotes.length)gen.appendChild(el('div','log-empty-note','コメントはまだありません。'));
-  for(const n of genNotes)gen.appendChild(noteBlock(v,n,{refresh,shot}));
-  gen.appendChild(mkInput('ショット全体へのコメント…（Shift+Enterで改行）',null));
-  left.appendChild(gen);
   /* フレームコメント（frameあり）→ 動画の右側 */
   const side=el('div','log-side');
   side.appendChild(el('div','log-side-head','フレームコメント / FB'));
@@ -2703,7 +2687,8 @@ async function uploadVersion(node,file,ui,opts){
     /* 名前：入力があればそれ、空欄なら動画のタイトル（拡張子なしのファイル名） */
     const vname=(opts.name&&opts.name.trim())||file.name.replace(/\.[^.]+$/,'');
     const version={id:newId('ver'),name:vname,type:isVideo?'video':'image',file:mediaRef,thumb:thumbRef,uploadedBy:currentUser(),uploadedAt:nowIso(),review:{status:'pending',notes:[]}};
-    if(opts.comment&&opts.comment.trim())version.review.notes.push({author:currentUser(),text:opts.comment.trim(),time:nowIso(),kind:'upload'});
+    /* アップロード時のコメントは「メッセージ」（node.comments）として記録（ショット全体コメントは廃止） */
+    if(opts.comment&&opts.comment.trim())(node.comments=node.comments||[]).push({id:newId('sc'),author:currentUser(),text:opts.comment.trim(),time:nowIso(),kind:'upload'});
     node.versions.push(version);if(thumbRef)node.thumbnail=thumbRef;
     await persist();ui.bi.style.width='100%';render();resolveThumbs();toast('アップロード完了: '+version.name);
   }catch(e){ui.prog.classList.add('hidden');toast('アップロード失敗: '+e.message)}
@@ -2715,7 +2700,7 @@ function openUploadModal(node,file){
       const inner=mHead(body,'動画を追加',file.name);
       const nameRow=frow('動画名（空欄ならファイル名をそのまま使用）','input');
       nameRow.f.placeholder=file.name.replace(/\.[^.]+$/,'');
-      const cmtRow=frow('コメント（任意・ショット全体へのコメントとして記録）','textarea');
+      const cmtRow=frow('コメント（任意・メッセージとして記録）','textarea');
       inner.appendChild(nameRow.r);inner.appendChild(cmtRow.r);
       const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=()=>{closeModal();res(false)};
       const ok=el('button','btn btn-primary','アップロード');
@@ -2878,12 +2863,12 @@ function openReview(nodeId,versionId){
   const list=el('div','fb-notes');side.appendChild(list);
   const iw=el('div','fb-input');
   const ta=el('textarea');ta.placeholder=isVideo?'このフレームにコメント…（Shift+Enterで改行）':'コメント…（Shift+Enterで改行）';
-  const sb=el('button','btn btn-primary btn-sm','記入');sb.title='コメント／アノテーションを記入（送信するまでタスクには反映されません）';
+  const sb=el('button','btn btn-primary btn-sm','記入');sb.title='コメント／アノテーションを記入（送信するまでタスクページには反映されません）';
   iw.appendChild(ta);iw.appendChild(sb);side.appendChild(iw);
   /* 送信バー：記入した内容をまとめてレビューページに反映 */
   const submitBar=el('div','fb-submit-bar');
   const submitLab=el('span','fb-unsent-lab');
-  const submitBtn=el('button','btn btn-primary btn-sm','送信');submitBtn.title='記入した内容をタスクに反映';
+  const submitBtn=el('button','btn btn-primary btn-sm','送信');submitBtn.title='記入した内容をタスクページに反映';
   submitBar.appendChild(submitLab);submitBar.appendChild(submitBtn);side.appendChild(submitBar);
   body.appendChild(side);
   ov.appendChild(body);
@@ -3782,7 +3767,7 @@ function openReel(){
   const clist=ce(d,'div','fb-notes');cside.appendChild(clist);
   const ciw=ce(d,'div','fb-input');
   const cta=d.createElement('textarea');cta.placeholder='このフレームにコメント…（Shift+Enterで改行）';
-  const csend=ce(d,'button','btn on','記入');csend.title='コメント／アノテを記入（送信するまでタスクには反映されません）';
+  const csend=ce(d,'button','btn on','記入');csend.title='コメント／アノテを記入（送信するまでタスクページには反映されません）';
   ciw.appendChild(cta);ciw.appendChild(csend);cside.appendChild(ciw);
   rowEl.appendChild(cside);
 
@@ -4077,7 +4062,7 @@ function openReel(){
   const unsentBar=ce(d,'div');unsentBar.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid #2a2a2f;font-size:11px';
   const unsentLab=ce(d,'span',null,'');unsentLab.style.color='#e0a63a';
   const usp=ce(d,'div');usp.style.flex='1';
-  const sendAllBtn=ce(d,'button','btn btn-sm on','送信');sendAllBtn.title='未送信の記入・アノテーション・コメントを、Reelで使用中の全ショットのタスクに反映';sendAllBtn.onclick=reelSubmit;
+  const sendAllBtn=ce(d,'button','btn btn-sm on','送信');sendAllBtn.title='未送信の記入・アノテーション・コメントを、Reelで使用中の全ショットのタスクページに反映';sendAllBtn.onclick=reelSubmit;
   unsentBar.appendChild(unsentLab);unsentBar.appendChild(usp);unsentBar.appendChild(sendAllBtn);
   cside.insertBefore(unsentBar,ciw);
   /* 未送信＝記入済み下書き(drafts)＋未記入の pending アノテ＋入力中コメント。
