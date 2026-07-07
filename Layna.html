@@ -2065,6 +2065,8 @@ function annotShotInto(cv,shot,n){
   }).catch(()=>{});
 }
 
+/* 描画のみ（コメントなし）のノートは「動画へのアノテ埋め込み専用」。コメント欄には出さない。 */
+function noteEmbedOnly(n){return !!(n&&n.drawing&&n.drawing.length&&!(n.text&&String(n.text).trim()))}
 /* 共通コメントブロック（編集・削除・フレームジャンプ・アノテスクショ対応） */
 function noteBlock(v,n,opts){
   opts=opts||{};
@@ -2164,7 +2166,7 @@ function logItem(node,v){
   const side=el('div','log-side');
   side.appendChild(el('div','log-side-head','フレームコメント / FB'));
   const notes=el('div','log-side-list');
-  let arr=v.review.notes.filter(n=>n.frame!=null);
+  let arr=v.review.notes.filter(n=>n.frame!=null&&!noteEmbedOnly(n));
   if(state.frameOrder)arr.sort((a,b)=>((a.frame??1e9)-(b.frame??1e9))||String(a.time).localeCompare(String(b.time)));
   if(!arr.length)notes.appendChild(el('div','log-empty-note','フレームコメントはまだありません。FB画面（⤢）または下の入力から。'));
   for(const n of arr)notes.appendChild(noteBlock(v,n,{refresh,onSeek:seekInline,shot}));
@@ -2983,9 +2985,10 @@ function openReview(nodeId,versionId){
   function updSubmit(){submitLab.textContent=drafts.length?('未送信の記入: '+drafts.length+'件'):'';submitBar.style.display=drafts.length?'':'none';}
   function renderNotes(){
     list.innerHTML='';
-    if(!v.review.notes.length&&!drafts.length)list.appendChild(el('div','log-empty-note','コメントはまだありません。'));
+    const shown=v.review.notes.filter(n=>!noteEmbedOnly(n)); /* 描画のみは動画に埋め込むだけでコメント欄には出さない */
+    if(!shown.length&&!drafts.length)list.appendChild(el('div','log-empty-note','コメントはまだありません。'));
     const refresh=async()=>{await persist();renderNotes();drawAll();drawTimeline()};
-    for(const n of v.review.notes)list.appendChild(noteBlock(v,n,{refresh,onSeek:isVideo?seekFrame:null}));
+    for(const n of shown)list.appendChild(noteBlock(v,n,{refresh,onSeek:isVideo?seekFrame:null}));
     for(const n of drafts)list.appendChild(draftBlock(n));
     list.scrollTop=list.scrollHeight;
   }
@@ -3687,10 +3690,11 @@ function openReel(){
     const dt=rvData();clist.innerHTML='';
     if(!dt){clist.appendChild(ce(d,'div','log-empty-note','クリップ未選択'));return}
     const cc=reelUI.clips[reelUI.cur];const cdr=(cc&&cc.drafts)||[];
-    if(!dt.v.review.notes.length&&!cdr.length)clist.appendChild(ce(d,'div','log-empty-note','コメントはまだありません。'));
+    const shown=dt.v.review.notes.filter(n=>!noteEmbedOnly(n)); /* 描画のみは動画に埋め込むだけでコメント欄には出さない */
+    if(!shown.length&&!cdr.length)clist.appendChild(ce(d,'div','log-empty-note','コメントはまだありません。'));
     const refresh=async()=>{await persist();reelNotes();drawAnno();drawFTL()};
     const shot={fileRef:dt.v.file,fps:dt.v.fps||24,isVideo:true};
-    for(const n of dt.v.review.notes)clist.appendChild(noteBlock(dt.v,n,{refresh,onSeek:f=>{video.pause();seekRTr(f)},shot}));
+    for(const n of shown)clist.appendChild(noteBlock(dt.v,n,{refresh,onSeek:f=>{video.pause();seekRTr(f)},shot}));
     for(const n of cdr)clist.appendChild(reelDraftBlock(cc,n));
     if(scrollEnd)clist.scrollTop=clist.scrollHeight;
   }
