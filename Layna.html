@@ -4491,6 +4491,7 @@ async function onAuthChanged(u){
   const role=roleFor(u.email);
   if(!role){authUser=null;renderDenied(u);return}
   authUser={name:u.displayName||u.email,email:u.email,photo:u.photoURL,role};
+  try{if(window.__laynaFB&&window.__laynaFB.recordUser)window.__laynaFB.recordUser(authUser)}catch(_){} /* ログイン記録（ドメイン許可ユーザーの可視化用） */
   clearAuthScreen();showAuthedHeader();startAppFlow();
 }
 async function initApp(){
@@ -4519,7 +4520,16 @@ initApp();
         const m=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
         const fs=m.getFirestore(app);const snap=await m.getDoc(m.doc(fs,'laynaAccess','config'));
         return snap.exists()?snap.data():null;
-      }catch(e){return null}}};
+      }catch(e){return null}},
+      /* ログインしたユーザー（email→表示名/写真）を Firestore(laynaAccess/loggedUsers) に記録。
+         アクセス管理コンソールが「ドメイン許可でログイン中のアカウント」や名前を表示するために使用。 */
+      recordUser:async(u)=>{try{
+        if(!u||!u.email)return;
+        const m=await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+        const fs=m.getFirestore(app);
+        const key=String(u.email).toLowerCase().replace(/[.@#$/\[\]]/g,'_');
+        await m.setDoc(m.doc(fs,'laynaAccess','loggedUsers'),{users:{[key]:{email:u.email,displayName:u.name||u.displayName||u.email,photoURL:u.photo||u.photoURL||'',lastSeen:new Date().toISOString()}}},{merge:true});
+      }catch(e){}}};
     onAuthStateChanged(auth,u=>{const uu=u?{displayName:u.displayName,email:u.email,photoURL:u.photoURL}:null;window.__laynaFBUser=uu;if(window.__laynaAuthChanged)window.__laynaAuthChanged(uu)});
   }catch(e){window.__laynaFBError=e&&e.message;window.__laynaFBUser=null;if(window.__laynaAuthChanged)window.__laynaAuthChanged(null);}
 </script>

@@ -73,7 +73,9 @@
 
   .u-list{display:flex;flex-direction:column;gap:8px}
   .u-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3)}
-  .u-email{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+  .u-email{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+  .u-name{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .u-mail{font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .role{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;letter-spacing:.5px}
   .role.op{background:rgba(214,169,95,.16);color:#d6a95f;border:1px solid rgba(214,169,95,.4)}
   .role.admin{background:rgba(199,199,207,.14);color:#c7c7cf;border:1px solid rgba(199,199,207,.32)}
@@ -168,6 +170,13 @@
         <div class="u-list" id="domList" style="margin-top:12px"></div>
       </div>
 
+      <!-- ドメイン許可でログイン中のアカウント -->
+      <div class="card">
+        <div class="card-title">🪪 ドメイン許可でログイン中のアカウント</div>
+        <div class="card-desc">許可ドメインのメールで実際に Layna にログインしたアカウントです（明示的に追加されていない人も表示）。名前つきで確認でき、「→メンバーに固定」で個別メンバーに変換できます。</div>
+        <div class="u-list" id="domUserList"></div>
+      </div>
+
       <!-- セットアップ（ルール） -->
       <div class="card">
         <div class="card-title">⚙ セットアップ（Firebase コンソール・初回のみ）</div>
@@ -205,6 +214,10 @@ service cloud.firestore {
         request.auth.token.email in resource.data.adminEmails );
       allow create: if request.auth != null;  // 初回だけ（作成者を運営に）
     }
+    // ログイン記録（本体が自分の情報を書き込み／コンソールが読取）
+    match /laynaAccess/loggedUsers {
+      allow read, write: if request.auth != null;
+    }
   }
 }`;
 
@@ -213,7 +226,7 @@ const lc=s=>String(s||'').toLowerCase();
 function escH(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function notify(msg){const n=$('notification');if(!n)return;n.textContent=msg;n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',3500);}
 
-let me=null, cfg=null, unsub=null, query='';
+let me=null, cfg=null, unsub=null, unsubLU=null, query='', luUsers={}, nameByEmail={};
 $('rulesPre')&&($('rulesPre').textContent=RULES);
 $('rulesPre2')&&($('rulesPre2').textContent=RULES);
 
@@ -227,14 +240,17 @@ function tiers(data){
   return {operators,admins,members,domains};
 }
 function isEditor(){ if(!cfg)return true; const t=tiers(cfg); return t.operators.includes(me.email)||t.admins.includes(me.email); }
+/* loggedUsers(email→表示名) から名前索引を作る。名前つき表示・ドメインログイン者の表示に使用 */
+function rebuildNames(){nameByEmail={};for(const u of Object.values(luUsers||{})){if(u&&u.email&&u.displayName){const k=lc(u.email);if(!nameByEmail[k])nameByEmail[k]=u.displayName}} if(me&&me.email&&me.name&&!nameByEmail[lc(me.email)])nameByEmail[lc(me.email)]=me.name;}
+function nameOf(email){return nameByEmail[lc(email)]||'';}
 
 $('loginBtn').onclick=()=>signInWithPopup(auth,provider).catch(e=>notify('ログイン失敗: '+e.message));
 $('logoutBtn').onclick=()=>signOut(auth);
 
 onAuthStateChanged(auth, user=>{
   $('loadingOverlay').classList.add('hidden');
-  if(unsub){unsub();unsub=null}
-  if(!user){ me=null; $('console').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); return; }
+  if(unsub){unsub();unsub=null} if(unsubLU){unsubLU();unsubLU=null}
+  if(!user){ me=null;luUsers={};nameByEmail={}; $('console').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); return; }
   me={email:user.email,name:user.displayName||user.email,photoURL:user.photoURL};
   $('loginScreen').classList.add('hidden');
   $('console').classList.remove('hidden');
@@ -246,6 +262,11 @@ function subscribe(){
   unsub=onSnapshot(doc(db,...CFG_PATH),
     snap=>{ cfg=snap.exists()?snap.data():null; render(); },
     err=>{ showError(err&&err.message); }
+  );
+  /* ログイン記録（laynaAccess/loggedUsers）を監視して名前・ドメインログイン者を表示 */
+  unsubLU=onSnapshot(doc(db,'laynaAccess','loggedUsers'),
+    snap=>{ luUsers=snap.exists()?(snap.data().users||{}):{}; rebuildNames(); if(cfg&&isEditor())paint(); },
+    err=>{}
   );
 }
 
@@ -287,10 +308,11 @@ function paint(){
   const flt=a=>q?a.filter(e=>lc(e).includes(q)):a;
   const editor=isEditor();
 
+  const idHtml=(email,self)=>{const nm=nameOf(email);return nm?`<span class="u-name">${escH(nm)}${self}</span><span class="u-mail">${escH(email)}</span>`:`<span class="u-name">${escH(email)}${self}</span>`;};
   const mkRow=(email,role,btns)=>{
     const self=(me&&email===me.email)?'（あなた）':'';
     const row=document.createElement('div');row.className='u-row';
-    row.innerHTML=`<span class="u-email">${escH(email)}${self}</span><span class="role ${role.cls}">${role.label}</span>`;
+    row.innerHTML=`<span class="u-email">${idHtml(email,self)}</span><span class="role ${role.cls}">${role.label}</span>`;
     btns.forEach(([label,fn,danger])=>{
       const b=document.createElement('button');b.className='btn btn-sm'+(danger?' btn-danger':'');b.textContent=label;b.disabled=!editor;b.onclick=fn;row.appendChild(b);
     });
@@ -317,6 +339,24 @@ function paint(){
     dL.appendChild(row);
   });
   if(!fd.length)dL.innerHTML='<div class="empty">'+(q?'該当なし':'許可ドメインはありません')+'</div>';
+
+  // ドメイン許可で実際にログインしたアカウント（明示登録されていない人）を名前つきで表示
+  const dul=$('domUserList');
+  if(dul){
+    const explicit=new Set([...operators,...admins,...members].map(lc));
+    let dusers=Object.values(luUsers||{}).filter(u=>u&&u.email&&!explicit.has(lc(u.email))&&domains.some(d=>lc(u.email).endsWith('@'+lc(d))));
+    if(q)dusers=dusers.filter(u=>lc(u.email).includes(q)||lc(u.displayName||'').includes(q));
+    dusers.sort((a,b)=>lc(a.displayName||a.email).localeCompare(lc(b.displayName||b.email)));
+    dul.innerHTML='';
+    dusers.forEach(u=>{
+      const self=(me&&lc(u.email)===lc(me.email))?'（あなた）':'';
+      const row=document.createElement('div');row.className='u-row';
+      row.innerHTML=`<span class="u-email">${idHtml(u.email,self)}</span><span class="role dom">ドメイン</span>`;
+      const b=document.createElement('button');b.className='btn btn-sm';b.textContent='→メンバーに固定';b.disabled=!editor;b.onclick=()=>setRole(u.email,'member');row.appendChild(b);
+      dul.appendChild(row);
+    });
+    if(!dusers.length)dul.innerHTML='<div class="empty">'+(q?'該当なし':(domains.length?'ドメイン許可でログインしたアカウントはまだありません':'許可ドメインが未設定です'))+'</div>';
+  }
 }
 
 async function readConfig(){const snap=await getDoc(doc(db,...CFG_PATH));return snap.exists()?snap.data():{};}
