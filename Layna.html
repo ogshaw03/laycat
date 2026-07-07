@@ -2586,7 +2586,7 @@ function openReview(nodeId,versionId){
   let drafts=[];
   const shownNotes=()=>v.review.notes.concat(drafts);
 
-  function close(){if(drafts.length&&!confirm('未送信の記入が '+drafts.length+' 件あります。閉じると失われます。よろしいですか？'))return;document.removeEventListener('keydown',onKey);ov.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
+  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;document.removeEventListener('keydown',onKey);ov.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
 
   /* --- トップバー --- */
   const top=el('div','fb-top');
@@ -2940,7 +2940,7 @@ function openReview(nodeId,versionId){
     else if(tool==='erase'){canvas.setPointerCapture(e.pointerId);erasing=true;eraseAt(e)}
   };
   canvas.onpointermove=e=>{if(stroke){stroke.points.push(pt(e));drawAll()}else if(erasing)eraseAt(e)};
-  canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;drawAll();drawTimeline()}erasing=false};
+  canvas.onpointerup=()=>{if(stroke){pending.push(stroke);stroke=null;drawAll();drawTimeline();updSubmit()}erasing=false};
   /* Alt+右ドラッグでブラシ/消しゴムサイズ調整（サイズプレビュー円付き） */
   brushSel.onchange=()=>{brushW=parseInt(brushSel.value)||brushW};
   eraseSel.onchange=()=>{eraseW=parseInt(eraseSel.value)||eraseW};
@@ -2952,8 +2952,8 @@ function openReview(nodeId,versionId){
   canvas.addEventListener('pointerdown',e=>{if(e.button!==2||!e.altKey||!tool)return;e.preventDefault();canvas.setPointerCapture(e.pointerId);const r=wrap.getBoundingClientRect();szAdj={x:e.clientX,rl:e.clientX-r.left,rt:e.clientY-r.top,start:tool==='erase'?eraseW:brushW,tool};fbShowRing()});
   canvas.addEventListener('pointermove',e=>{if(!szAdj)return;const ns=Math.max(1,Math.min(200,szAdj.start+(e.clientX-szAdj.x)*0.4));if(szAdj.tool==='erase'){eraseW=ns;setSizeSel(eraseSel,ns,'消し ')}else{brushW=ns;setSizeSel(brushSel,ns,'ブラシ ')}fbShowRing()});
   canvas.addEventListener('pointerup',()=>{if(szAdj){szAdj=null;sizeRing.style.display='none'}});
-  undoBtn.onclick=()=>{pending.pop();drawAll();drawTimeline()};
-  clearBtn.onclick=()=>{pending=[];stroke=null;drawAll();drawTimeline()};
+  undoBtn.onclick=()=>{pending.pop();drawAll();drawTimeline();updSubmit()};
+  clearBtn.onclick=()=>{pending=[];stroke=null;drawAll();drawTimeline();updSubmit()};
   buildLayerPanel();
 
   /* --- 再生同期（フレーム表示・そのフレームの描画・タイムライン） --- */
@@ -2982,7 +2982,9 @@ function openReview(nodeId,versionId){
     if(n.text&&n.text!=='（描画のみ）')b.appendChild(el('div','t',n.text));
     return b;
   }
-  function updSubmit(){submitLab.textContent=drafts.length?('未送信の記入: '+drafts.length+'件'):'';submitBar.style.display=drafts.length?'':'none';}
+  /* 未送信＝記入済み下書き(drafts)＋未記入の pending アノテ＋入力中コメント。
+     どれかあれば送信バーを表示（アノテのみ・記入し忘れでも送信できるようにリールと統一） */
+  function updSubmit(){const has=drafts.length||pending.length||(ta&&ta.value.trim());submitLab.textContent=drafts.length?('未送信の記入: '+drafts.length+'件'):(has?'未送信の内容があります':'');submitBar.style.display=has?'':'none';}
   function renderNotes(){
     list.innerHTML='';
     const shown=v.review.notes.filter(n=>!noteEmbedOnly(n)); /* 描画のみは動画に埋め込むだけでコメント欄には出さない */
@@ -3009,14 +3011,17 @@ function openReview(nodeId,versionId){
     drafts.push(n);pending=[];stroke=null;
     ta.value='';renderNotes();drawAll();drawTimeline();updSubmit();
   };
-  /* 送信：記入した内容をまとめてレビューページ(v.review.notes)へ反映 */
+  /* 送信：記入した内容をまとめてレビューページ(v.review.notes)へ反映。
+     未記入の pending アノテ・入力中コメントも自動で記入してから送信（リールと統一）。 */
   async function submit(){
+    if(ta.value.trim()||pending.length)record(); /* 未記入分を自動記入（record は同期的に drafts へ積む） */
     if(!drafts.length)return;
     for(const n of drafts){delete n._draft;v.review.notes.push(n)}
     drafts=[];
     await persist();renderNotes();drawAll();drawTimeline();updSubmit();renderBody();resolveThumbs();
   }
   sb.onclick=record;submitBtn.onclick=submit;
+  ta.oninput=()=>updSubmit(); /* 入力中コメントでも送信バーを表示 */
   ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();record()}};
 
   /* --- キーボード --- */
