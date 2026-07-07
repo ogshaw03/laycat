@@ -3881,16 +3881,20 @@ function openReel(){
     RV.stroke=null;cta.value='';
     drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
   };
-  /* 送信：Reelのタイムラインで使用中の全ショット（全クリップ）の下書きをレビューページへ反映 */
+  /* 送信：Reelのタイムラインで使用中の全ショット（全クリップ）の未送信内容をレビューページへ反映。
+     まだ「記入」していない pending アノテーション・入力中コメントも自動で記入してから送信するので、
+     アノテーションのみ・記入し忘れのカットも含めて全カットが反映される。 */
   async function reelSubmit(){
+    const cc=reelUI.clips[reelUI.cur];if(cc)cc.commentDraft=cta.value; /* 入力途中のコメントも取り込む */
     let total=0;
     for(const c of reelUI.clips){
+      reelRecord(c,c===cc?dispF():null); /* 未記入の pending＋コメントをこのカットの下書きへ */
       if(!c.drafts||!c.drafts.length)continue;const vv=vOf(c);if(!vv)continue;
       for(const n of c.drafts)vv.review.notes.push(n);
       total+=c.drafts.length;c.drafts=[];
     }
     if(!total){reelWin.alert('未送信の記入はありません');return}
-    RV.stroke=null;
+    RV.stroke=null;cta.value='';
     await persist();drawAnno();drawFTL();reelNotes(true);reelRender();updUnsent();
   }
   csend.onclick=reelRecordCur;
@@ -3900,13 +3904,18 @@ function openReel(){
   const unsentBar=ce(d,'div');unsentBar.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid #2a2a2f;font-size:11px';
   const unsentLab=ce(d,'span',null,'');unsentLab.style.color='#e0a63a';
   const usp=ce(d,'div');usp.style.flex='1';
-  const sendAllBtn=ce(d,'button','btn btn-sm on','送信');sendAllBtn.title='記入した内容を、Reelで使用中の全ショットのレビューページに反映';sendAllBtn.onclick=reelSubmit;
+  const sendAllBtn=ce(d,'button','btn btn-sm on','送信');sendAllBtn.title='未送信の記入・アノテーション・コメントを、Reelで使用中の全ショットのレビューページに反映';sendAllBtn.onclick=reelSubmit;
   unsentBar.appendChild(unsentLab);unsentBar.appendChild(usp);unsentBar.appendChild(sendAllBtn);
   cside.insertBefore(unsentBar,ciw);
+  /* 未送信＝記入済み下書き(drafts)＋未記入の pending アノテ＋入力中コメント。
+     どれか1つでもあれば送信ボタンを表示する（記入し忘れ・アノテのみでも送信できるように） */
   function updUnsent(){
     let clips=0,items=0;
-    for(const c of reelUI.clips){const n=(c.drafts&&c.drafts.length)||0;if(n){clips++;items+=n}}
-    unsentLab.textContent=items?('未送信の記入: '+items+'件（'+clips+'カット）'):'';
+    for(const c of reelUI.clips){
+      const n=((c.drafts&&c.drafts.length)||0)+((c.pending&&c.pending.length)||0)+(((c.commentDraft||'').trim())?1:0);
+      if(n){clips++;items+=n}
+    }
+    unsentLab.textContent=items?('未送信: '+items+'件（'+clips+'カット）'):'';
     sendAllBtn.style.display=items?'':'none';
   }
   reelUI.updUnsent=updUnsent;
