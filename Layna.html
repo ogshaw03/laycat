@@ -2067,6 +2067,38 @@ function annotShotInto(cv,shot,n){
 
 /* 描画のみ（コメントなし）のノートは「動画へのアノテ埋め込み専用」。コメント欄には出さない。 */
 function noteEmbedOnly(n){return !!(n&&n.drawing&&n.drawing.length&&!(n.text&&String(n.text).trim()))}
+/* pending ストローク＋コメントを、各ストローク自身のフレーム(p.f)ごとに分割したノート配列にする。
+   ・複数フレームにまたがって描いても、線は描いたフレームに正しく割り当てられる（ズレ防止）
+   ・コメントは現在フレーム(curFrame)のノートに付け、無ければコメント単独ノートを作る
+   ・isVideo=false（画像）はフレームなしの1ノートにまとめる
+   レビューページ(record)とリール(buildNotes)で共通利用し、ロジックの分岐も防ぐ。 */
+function buildFrameNotes(pending,opts){
+  opts=opts||{};pending=pending||[];
+  const who=opts.author||currentUser(),t=nowIso();
+  const pdur=opts.dur||1;const txt=(opts.text||'').trim();
+  const isVideo=opts.isVideo!==false;
+  if(!pending.length&&!txt)return [];
+  const notes=[];
+  if(pending.length){
+    if(isVideo){
+      const byFrame=new Map();
+      for(const p of pending){const fr=(p.f!=null?p.f:(opts.curFrame!=null?opts.curFrame:0));if(!byFrame.has(fr))byFrame.set(fr,[]);byFrame.get(fr).push(p)}
+      for(const fr of [...byFrame.keys()].sort((a,b)=>a-b))
+        notes.push({author:who,text:'',time:t,frame:fr,dur:pdur,drawing:byFrame.get(fr).map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}))});
+    }else{
+      notes.push({author:who,text:'',time:t,drawing:pending.map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}))});
+    }
+  }
+  if(txt){
+    if(!isVideo){if(notes[0])notes[0].text=txt;else notes.push({author:who,text:txt,time:t})}
+    else{
+      const cf=(opts.curFrame!=null?opts.curFrame:(notes[0]&&notes[0].frame!=null?notes[0].frame:0));
+      const at=notes.find(n=>n.frame===cf);
+      if(at)at.text=txt;else notes.push({author:who,text:txt,time:t,frame:cf});
+    }
+  }
+  return notes;
+}
 /* 共通コメントブロック（編集・削除・フレームジャンプ・アノテスクショ対応） */
 function noteBlock(v,n,opts){
   opts=opts||{};
@@ -2728,12 +2760,15 @@ function openReview(nodeId,versionId){
 
   /* --- フレーム制御（リアルタイムスクラブ対応） --- */
   const curFrame=()=>isVideo?Math.min(totalFrames-1,Math.max(0,Math.round(media.currentTime*FPS))):null;
-  let scrubbing=false,scrubTarget=-1,seekBusy=false,seekPend=-1;
-  const dispFrame=()=>scrubbing&&scrubTarget>=0?scrubTarget:(curFrame()||0);
+  let scrubbing=false,scrubTarget=-1,seekBusy=false,seekPend=-1,seekTargetF=-1;
+  /* シーク中は currentTime がまだ追いついていないため、目的フレームを返す
+     （移動直後に描いた線が前のフレームに割り当たるズレを防ぐ） */
+  const dispFrame=()=>scrubbing&&scrubTarget>=0?scrubTarget:((isVideo&&seekBusy&&seekTargetF>=0)?seekTargetF:(curFrame()||0));
   function fmtFrame(){frameLab.textContent='F '+dispFrame()+' / '+(totalFrames-1)}
   let seekGuard=0;
   function seekRT(f){
     f=Math.max(0,Math.min(f,totalFrames-1));
+    seekTargetF=f; /* 目的フレームを記録（シーク完了までは dispFrame がこれを返す） */
     const t=f/FPS+0.0001;
     if(Math.abs(media.currentTime-t)<0.0005){refreshView();return} // 同一時刻はスキップ（seeked不発でも詰まらない）
     if(seekBusy){seekPend=f;return}
@@ -2999,16 +3034,12 @@ function openReview(nodeId,versionId){
      ・コメント＋アノテ → テキスト＋描画スクショ／・コメントのみ → テキスト／・アノテのみ → 描画スクショ
      ・描いて記入を押さなければ pending のまま（クリップに埋め込み表示されるだけで反映されない） */
   const record=async()=>{
-    const txt=ta.value.trim();
-    if(!txt&&!pending.length)return;
-    const n={author:currentUser(),text:txt||'',time:nowIso(),_draft:true};
-    if(isVideo)n.frame=dispFrame();
-    if(pending.length){
-      if(isVideo&&pending[0].f!=null)n.frame=pending[0].f;
-      n.drawing=pending.map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}));
-      n.dur=parseInt(durSel.value)||1;
-    }
-    drafts.push(n);pending=[];stroke=null;
+    /* 各線は描いたフレームごとに別ノートへ（複数フレームにまたがってもズレない）。
+       コメントは現在フレームのノートに付ける。リールと同じ buildFrameNotes を使用。 */
+    const notes=buildFrameNotes(pending,{text:ta.value,curFrame:isVideo?dispFrame():null,dur:parseInt(durSel.value)||1,isVideo});
+    if(!notes.length)return;
+    for(const n of notes)n._draft=true;
+    drafts.push(...notes);pending=[];stroke=null;
     ta.value='';renderNotes();drawAll();drawTimeline();updSubmit();
   };
   /* 送信：記入した内容をまとめてレビューページ(v.review.notes)へ反映。
@@ -3554,7 +3585,7 @@ function openReel(){
   maincol.appendChild(ctr);
 
   /* ==== レビュー統一：アノテーション＋フレーム単位スクラブ ==== */
-  const RV={FPS:24,total:1,last:-1,pending:[],stroke:null,tool:null,erasing:false,eye:true,scrub:false,scrubT:-1,busy:false,pend:-1,guard:0,brushW:4,eraseW:16};
+  const RV={FPS:24,total:1,last:-1,pending:[],stroke:null,tool:null,erasing:false,eye:true,scrub:false,scrubT:-1,busy:false,pend:-1,seekF:-1,guard:0,brushW:4,eraseW:16};
   const anno=ce(d,'canvas');anno.style.cssText='position:absolute;z-index:5;cursor:crosshair;touch-action:none;pointer-events:none';
   ztrans.appendChild(anno);
   let rGhost=false,rTraceOp=0;
@@ -3631,7 +3662,8 @@ function openReel(){
   const gOffset=idx=>{let s=0;for(let i=0;i<idx;i++)s+=clipFrames(reelUI.clips[i]);return s};
   const gTotal=()=>Math.max(1,reelUI.clips.reduce((a,c)=>a+clipFrames(c),0));
   const curF=()=>Math.min(RV.total-1,Math.max(0,Math.round((video.currentTime||0)*RV.FPS)));
-  const dispF=()=>RV.scrub&&RV.scrubT>=0?RV.scrubT:curF();
+  /* シーク中は currentTime が追いつく前でも目的フレーム(RV.seekF)を返す（描画フレームのズレ防止） */
+  const dispF=()=>RV.scrub&&RV.scrubT>=0?RV.scrubT:((RV.busy&&RV.seekF>=0)?RV.seekF:curF());
   /* レイヤー状態（FBと同じ挙動） */
   RV.activeLayer=1;RV.layerVis=[true,true,true,true,true];RV.layerCount=1;
   const lyrCards=[];
@@ -3704,7 +3736,7 @@ function openReel(){
     if(scrollEnd)clist.scrollTop=clist.scrollHeight;
   }
   function seekRTr(f){
-    f=Math.max(0,Math.min(f,RV.total-1));const t=f/RV.FPS+0.0001;
+    f=Math.max(0,Math.min(f,RV.total-1));RV.seekF=f;const t=f/RV.FPS+0.0001;
     if(Math.abs(video.currentTime-t)<0.0005){RV.last=-1;return}
     if(RV.busy){RV.pend=f;return}
     RV.busy=true;clearTimeout(RV.guard);
@@ -3866,19 +3898,11 @@ function openReel(){
   eyeB.onclick=()=>{RV.eye=!RV.eye;eyeB.classList.toggle('on',RV.eye);drawAnno()};
   undoB.onclick=()=>{RV.pending.pop();drawAnno();drawFTL();updUnsent()};
   clrB.onclick=()=>{RV.pending.splice(0,RV.pending.length);RV.stroke=null;drawAnno();drawFTL();updUnsent()};
-  /* 記入内容からノート配列を生成（描画は線ごとのフレームに分割）。レビューには push しない */
+  /* 記入内容からノート配列を生成（描画は線ごとのフレームに分割）。レビューには push しない。
+     レビューページ(record)と共通の buildFrameNotes を使用（ロジック分岐・フレームズレを防ぐ）。 */
   function buildNotes(c,curFrame){
     const vv=vOf(c);if(!vv)return [];
-    const pend=c.pending||[];const txt=(c.commentDraft||'').trim();
-    if(!pend.length&&!txt)return [];
-    const pdur=parseInt(durS.value)||1;const who=currentUser(),t=nowIso();
-    const byFrame={};
-    for(const p of pend){const fr=(p.f!=null?p.f:(curFrame!=null?curFrame:0));(byFrame[fr]=byFrame[fr]||[]).push(p)}
-    const notes=[];
-    for(const fr of Object.keys(byFrame).map(Number).sort((a,b)=>a-b))
-      notes.push({author:who,text:'',time:t,frame:fr,dur:pdur,drawing:byFrame[fr].map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}))});
-    if(txt){const cf=(curFrame!=null?curFrame:(notes[0]?notes[0].frame:0));const at=notes.find(n=>n.frame===cf);if(at)at.text=txt;else notes.push({author:who,text:txt,time:t,frame:cf})}
-    return notes;
+    return buildFrameNotes(c.pending||[],{text:c.commentDraft||'',curFrame,dur:parseInt(durS.value)||1,isVideo:true});
   }
   /* 記入：現在クリップの pending＋コメントを下書き(c.drafts)へ。まだレビューには反映しない */
   function reelRecord(c,curFrame,noShot){
