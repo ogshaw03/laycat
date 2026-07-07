@@ -2083,7 +2083,7 @@ function noteBlock(v,n,opts){
   const ed=el('button','na','✎ 編集');
   const del=el('button','na','✕');del.title='削除';
   acts.appendChild(ed);acts.appendChild(del);m.appendChild(acts);
-  const t=el('div','t',n.text);
+  const t=el('div','t',n.text==='（描画のみ）'?'':n.text); /* 旧データの「（描画のみ）」は表示しない */
   note.appendChild(m);note.appendChild(t);
   /* アノテーション付きフレームのスクショをコメントに表示（noShot＝記入せず送信した描画のみは省略） */
   if(opts.shot&&opts.shot.isVideo&&n.drawing&&n.drawing.length&&!n.noShot){
@@ -2996,7 +2996,7 @@ function openReview(nodeId,versionId){
   const record=async()=>{
     const txt=ta.value.trim();
     if(!txt&&!pending.length)return;
-    const n={author:currentUser(),text:txt||'（描画のみ）',time:nowIso(),_draft:true};
+    const n={author:currentUser(),text:txt||'',time:nowIso(),_draft:true};
     if(isVideo)n.frame=dispFrame();
     if(pending.length){
       if(isVideo&&pending[0].f!=null)n.frame=pending[0].f;
@@ -3780,13 +3780,19 @@ function openReel(){
       }
       off+=cf;
     });
-    /* 未送信マーカー：全クリップ分をそれぞれの位置に描画（跨いでも消えない） */
+    /* 未記入(pending)マーカー：全クリップ分をそれぞれの位置に描画（跨いでも消えない） */
     const pdur=parseInt(durS.value)||1;
     ctx.fillStyle='rgba(224,138,74,.5)';
     let poff=0;
     cs.forEach(c=>{
       for(const p of (c.pending||[]))if(p.f!=null)ctx.fillRect((poff+p.f)*fw,10,Math.max(2.5,fw*pdur),5);
       poff+=clipFrames(c);
+    });
+    /* 記入済み(未送信/drafts)マーカー：記入後もマーカーが消えないように描画 */
+    let doff=0;ctx.fillStyle='rgba(224,166,58,.9)';
+    cs.forEach(c=>{
+      for(const n of (c.drafts||[]))if(n.frame!=null)ctx.fillRect((doff+n.frame)*fw,10,Math.max(2.5,fw*(parseInt(n.dur)||1)),5);
+      doff+=clipFrames(c);
     });
     /* キャッシュ済み（デコード済み・遅延なしで表示できる）クリップ範囲を最下部に細い青ライン表示 */
     let coff=0;ctx.fillStyle='#3b82f6';
@@ -3861,7 +3867,7 @@ function openReel(){
     for(const p of pend){const fr=(p.f!=null?p.f:(curFrame!=null?curFrame:0));(byFrame[fr]=byFrame[fr]||[]).push(p)}
     const notes=[];
     for(const fr of Object.keys(byFrame).map(Number).sort((a,b)=>a-b))
-      notes.push({author:who,text:'（描画のみ）',time:t,frame:fr,dur:pdur,drawing:byFrame[fr].map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}))});
+      notes.push({author:who,text:'',time:t,frame:fr,dur:pdur,drawing:byFrame[fr].map(p=>({color:p.color,points:p.points,layer:p.layer||1,w:p.w}))});
     if(txt){const cf=(curFrame!=null?curFrame:(notes[0]?notes[0].frame:0));const at=notes.find(n=>n.frame===cf);if(at)at.text=txt;else notes.push({author:who,text:txt,time:t,frame:cf})}
     return notes;
   }
@@ -3870,7 +3876,7 @@ function openReel(){
     const notes=buildNotes(c,curFrame);if(!notes.length)return 0;
     /* 記入せず送信した「描画のみ」ノートはスクショを取らない（パラパラ漫画で大量に溜まるのを防ぐ）。
        コメント付き・明示的に記入したものはスクショを残す。 */
-    if(noShot)for(const n of notes)if(n.drawing&&n.drawing.length&&n.text==='（描画のみ）')n.noShot=true;
+    if(noShot)for(const n of notes)if(n.drawing&&n.drawing.length&&!n.text)n.noShot=true;
     (c.drafts=c.drafts||[]).push(...notes);
     if(c.pending)c.pending.length=0;c.commentDraft='';
     return notes.length;
