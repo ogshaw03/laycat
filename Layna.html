@@ -93,10 +93,16 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-chip .ico{margin-right:.4em}
 .ico+*{vertical-align:middle}
 /* プロジェクトのタブ（タイムライン / 進捗 / ショット） */
-.ptab-nav{position:sticky;top:0;z-index:20;background:var(--bg);display:flex;gap:2px;border-bottom:1px solid var(--border);margin:-14px -20px 18px;padding:12px 20px 0}
+.ptab-wrap{position:sticky;top:0;z-index:20;background:var(--bg);margin:-14px -20px 18px;border-bottom:1px solid var(--border)}
+.ptab-nav{display:flex;gap:2px;padding:12px 20px 0}
+.ptab-nav.ptab-sub{padding:0 20px;border-top:1px solid var(--border);background:var(--bg2);align-items:center;gap:10px;min-height:40px}
+.ptab-sub .sub-lead{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;flex-shrink:0}
 .ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.5px;padding:9px 18px;cursor:pointer;margin-bottom:-1px}
 .ptab:hover{color:var(--text)}
-.ptab.on{color:var(--text);border-bottom-color:var(--edge)}
+.ptab.on{color:var(--text);border-bottom-color:var(--accent2)}
+.ptab.sub-tab{display:inline-flex;align-items:center;gap:6px;max-width:460px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ptab.sub-tab .ico{flex-shrink:0}
+.ptab.disabled,.ptab.disabled:hover{opacity:.5;cursor:default;color:var(--text3);font-weight:500;letter-spacing:0}
 /* タブ内の進捗・ショット（メインウィンドウ埋め込み版） */
 .pm-sel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .pm-sel label{font-size:11px;color:var(--text3)}
@@ -1381,20 +1387,34 @@ function rootOf(node){let n=node;while(n&&n.parentId){const p=getNode(n.parentId
 /* プロジェクトの上部タブ（常に表示）。タブクリックでプロジェクトのトップ＋該当タブへ */
 function buildProjectTabs(root){
   if(!['timeline','progress','shots','browse'].includes(state.projTab))state.projTab='timeline';
-  /* 現在サブページ（root以外）にいるときは「ページ」タブをアクティブ扱いにする */
   const onRoot=state.currentId===root.id&&!state.search.trim();
+  const wrap=el('div','ptab-wrap');
+  /* 上段：プロジェクトのビュー（タイムライン / 進捗 / ショット） */
   const nav=el('div','ptab-nav');
-  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット'],['browse','ページ']]){
-    const active=onRoot?state.projTab===id:(id==='browse');
+  for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット']]){
+    const active=onRoot&&state.projTab===id;
     const b=el('button','ptab'+(active?' on':''),lab);
-    b.onclick=()=>{
-      /* 「ページ」タブは最後に開いていた画面へ復帰（同一プロジェクト内・存在する場合） */
-      let target=root.id;
-      if(id==='browse'){const lp=state.lastPageId&&getNode(state.lastPageId);if(lp&&rootOf(lp).id===root.id)target=state.lastPageId}
-      state.currentId=target;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(target))state.expanded.add(n.id);syncHash();render()};
+    b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
     nav.appendChild(b);
   }
-  return nav;
+  wrap.appendChild(nav);
+  /* 下段：左サイドバー／ショットから選択した現在のタスク（レビューページ）を表示 */
+  const subNav=el('div','ptab-nav ptab-sub');
+  subNav.appendChild(el('span','sub-lead','タスク'));
+  const curSub=(!onRoot&&state.currentId&&state.currentId!==root.id)?getNode(state.currentId):null;
+  const lp=state.lastPageId&&getNode(state.lastPageId);
+  const pageNode=curSub||((lp&&lp.id!==root.id&&rootOf(lp)&&rootOf(lp).id===root.id)?lp:null);
+  if(pageNode){
+    const b=el('button','ptab sub-tab'+(curSub?' on':''));
+    b.appendChild(icoEl(pageNode.type==='review'?'film':'folder'));
+    b.appendChild(document.createTextNode(' '+pageNode.name));
+    b.onclick=()=>{state.currentId=pageNode.id;state.projTab='browse';state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(pageNode.id))state.expanded.add(n.id);syncHash();render()};
+    subNav.appendChild(b);
+  }else{
+    subNav.appendChild(el('button','ptab sub-tab disabled','左のツリーやショットからタスクを選択'));
+  }
+  wrap.appendChild(subNav);
+  return wrap;
 }
 /* 保存先フォルダ未設定の警告バナー（動画はフォルダにしか保存できないため） */
 function folderWarnBanner(root){
