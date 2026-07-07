@@ -93,16 +93,22 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-chip .ico{margin-right:.4em}
 .ico+*{vertical-align:middle}
 /* プロジェクトのタブ（タイムライン / 進捗 / ショット） */
-.ptab-wrap{position:sticky;top:0;z-index:20;background:var(--bg);margin:-14px -20px 18px;border-bottom:1px solid var(--border)}
-.ptab-nav{display:flex;gap:2px;padding:12px 20px 0}
-.ptab-nav.ptab-sub{padding:0 20px;border-top:1px solid var(--border);background:var(--bg2);align-items:center;gap:10px;min-height:40px}
-.ptab-sub .sub-lead{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;flex-shrink:0}
-.ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.5px;padding:9px 18px;cursor:pointer;margin-bottom:-1px}
+/* プロジェクトタブ（ヘッダ内・タイトルの右） */
+.head-tabs{display:flex;gap:2px;align-items:flex-end;align-self:stretch}
+.ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--text3);font-family:var(--font-head);font-size:14px;font-weight:700;letter-spacing:.5px;padding:8px 16px;cursor:pointer}
 .ptab:hover{color:var(--text)}
 .ptab.on{color:var(--text);border-bottom-color:var(--accent2)}
-.ptab.sub-tab{display:inline-flex;align-items:center;gap:6px;max-width:460px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.ptab.sub-tab .ico{flex-shrink:0}
-.ptab.disabled,.ptab.disabled:hover{opacity:.5;cursor:default;color:var(--text3);font-weight:500;letter-spacing:0}
+/* タスクタブ列（ヘッダ直下・開いているタスクページをブラウザのタブ風に複数並べる） */
+.task-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-14px -20px 16px;padding:8px 20px;background:var(--bg2);border-bottom:1px solid var(--border);min-height:42px}
+.task-tabs .sub-lead{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;flex-shrink:0;margin-right:2px}
+.task-tabs-empty{font-size:12px;color:var(--text3)}
+.task-tab{display:inline-flex;align-items:center;gap:6px;max-width:280px;padding:5px 8px 5px 11px;border:1px solid var(--border);border-radius:var(--radius2);background:var(--bg3);color:var(--text2);cursor:pointer;font-size:12px}
+.task-tab:hover{border-color:var(--border2);color:var(--text)}
+.task-tab.on{background:var(--bg4);border-color:var(--border2);color:var(--text)}
+.task-tab .ico{flex-shrink:0}
+.task-tab .tt-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.task-tab .tt-close{border:none;background:none;color:var(--text3);font-size:11px;padding:0 2px;line-height:1;border-radius:4px;flex-shrink:0}
+.task-tab .tt-close:hover{background:rgba(255,255,255,.12);color:var(--text)}
 /* タブ内の進捗・ショット（メインウィンドウ埋め込み版） */
 .pm-sel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .pm-sel label{font-size:11px;color:var(--text3)}
@@ -716,7 +722,7 @@ const storage={
 /* ---------- 状態 / DB ---------- */
 let DB=null;let curUploadUI=null;
 let REG=[]; /* 接続プロジェクト一覧（このユーザーが使うプロジェクト）: [{id,name,folderName}] */
-const state={currentId:null,search:'',expanded:new Set(),frameOrder:false,tabDrawers:{}};
+const state={currentId:null,search:'',expanded:new Set(),frameOrder:false,tabDrawers:{},openTasks:[]};
 function defaultDb(){return{version:3,nodes:[],reels:[],notifications:[],submits:[]}}
 /* プロジェクト（ルート）ID を求める */
 function projectIdOf(nodeId){const n=getNode(nodeId);return n?rootOf(n).id:null}
@@ -1174,7 +1180,7 @@ async function subSendToReel(sb){
 /* ============================================================
    ナビ / レンダリング
    ============================================================ */
-function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;state.reviewOpen=null;$('#searchInput').value='';for(const n of pathOf(id))state.expanded.add(n.id);syncHash();render()}
+function go(id){state.currentId=id;state.search='';state.projTab='timeline';state.pmPick=null;state.reviewOpen=null;$('#searchInput').value='';const nn=getNode(id);if(nn&&nn.parentId){state.openTasks=(state.openTasks||[]).filter(x=>x!==id);state.openTasks.push(id)}/* サブページ（タスク/カテゴリ）はタブとして開く */for(const n of pathOf(id))state.expanded.add(n.id);syncHash();render()}
 /* ============================================================
    URLルーティング（ハッシュ）— 画面ごとに固有URL・作業者間でリンク共有
    #/                     ホーム
@@ -1342,7 +1348,9 @@ function renderMainHead(){
   }else title.textContent='プロジェクト一覧';
   box.appendChild(title);
   if(cur&&cur.description)box.appendChild(el('div','desc',cur.description));
-  h.appendChild(box);h.appendChild(el('div','spacer'));
+  h.appendChild(box);
+  if(cur)h.appendChild(buildProjectTabsHead(rootOf(cur))); /* プロジェクトタブ（タイムライン/進捗/ショット）をヘッダに配置 */
+  h.appendChild(el('div','spacer'));
   if(cur&&cur.type==='review'&&cur.versions.length){
     /* レビューページ単位のステータス設定（プルダウン式） */
     h.appendChild(buildStatusSelect(cur));
@@ -1385,36 +1393,51 @@ function renderMainHead(){
 /* ノードのルート（プロジェクト） */
 function rootOf(node){let n=node;while(n&&n.parentId){const p=getNode(n.parentId);if(!p)break;n=p}return n;}
 /* プロジェクトの上部タブ（常に表示）。タブクリックでプロジェクトのトップ＋該当タブへ */
-function buildProjectTabs(root){
+/* ヘッダ内のプロジェクトタブ（タイムライン / 進捗 / ショット） */
+function buildProjectTabsHead(root){
   if(!['timeline','progress','shots','browse'].includes(state.projTab))state.projTab='timeline';
   const onRoot=state.currentId===root.id&&!state.search.trim();
-  const wrap=el('div','ptab-wrap');
-  /* 上段：プロジェクトのビュー（タイムライン / 進捗 / ショット） */
-  const nav=el('div','ptab-nav');
+  const nav=el('div','head-tabs');
   for(const [id,lab] of [['timeline','タイムライン'],['progress','進捗'],['shots','ショット']]){
     const active=onRoot&&state.projTab===id;
     const b=el('button','ptab'+(active?' on':''),lab);
     b.onclick=()=>{state.currentId=root.id;state.projTab=id;state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(root.id))state.expanded.add(n.id);syncHash();render()};
     nav.appendChild(b);
   }
-  wrap.appendChild(nav);
-  /* 下段：左サイドバー／ショットから選択した現在のタスク（レビューページ）を表示 */
-  const subNav=el('div','ptab-nav ptab-sub');
-  subNav.appendChild(el('span','sub-lead','タスク'));
-  const curSub=(!onRoot&&state.currentId&&state.currentId!==root.id)?getNode(state.currentId):null;
-  const lp=state.lastPageId&&getNode(state.lastPageId);
-  const pageNode=curSub||((lp&&lp.id!==root.id&&rootOf(lp)&&rootOf(lp).id===root.id)?lp:null);
-  if(pageNode){
-    const b=el('button','ptab sub-tab'+(curSub?' on':''));
-    b.appendChild(icoEl(pageNode.type==='review'?'film':'folder'));
-    b.appendChild(document.createTextNode(' '+pageNode.name));
-    b.onclick=()=>{state.currentId=pageNode.id;state.projTab='browse';state.pmPick=null;state.search='';$('#searchInput').value='';for(const n of pathOf(pageNode.id))state.expanded.add(n.id);syncHash();render()};
-    subNav.appendChild(b);
-  }else{
-    subNav.appendChild(el('button','ptab sub-tab disabled','左のツリーやショットからタスクを選択'));
+  return nav;
+}
+/* 下段：左サイドバー／ショットから開いたタスク（タスクページ）をタブとして複数並べる（ブラウザのタブ風） */
+function buildTaskTabs(root){
+  state.openTasks=(state.openTasks||[]).filter(id=>{const n=getNode(id);return n&&rootOf(n)&&rootOf(n).id===root.id});
+  const strip=el('div','task-tabs');
+  strip.appendChild(el('span','sub-lead','タスク'));
+  if(!state.openTasks.length){
+    strip.appendChild(el('span','task-tabs-empty','左のツリーやショットからタスクを開くとここにタブで並びます'));
+    return strip;
   }
-  wrap.appendChild(subNav);
-  return wrap;
+  for(const id of state.openTasks){
+    const n=getNode(id);if(!n)continue;
+    const active=state.currentId===id;
+    const tab=el('div','task-tab'+(active?' on':''));
+    tab.appendChild(icoEl(n.type==='review'?'film':'folder'));
+    tab.appendChild(el('span','tt-name',n.name));
+    tab.onclick=()=>{state.currentId=id;state.projTab='browse';state.pmPick=null;state.search='';$('#searchInput').value='';for(const x of pathOf(id))state.expanded.add(x.id);syncHash();render()};
+    const x=el('button','tt-close','✕');x.title='タブを閉じる';
+    x.onclick=e=>{e.stopPropagation();
+      const wasCur=state.currentId===id;
+      const idx=state.openTasks.indexOf(id);
+      state.openTasks=state.openTasks.filter(t=>t!==id);
+      if(wasCur){
+        const next=state.openTasks[idx]||state.openTasks[idx-1]||null;
+        if(next){state.currentId=next;state.projTab='browse';for(const y of pathOf(next))state.expanded.add(y.id)}
+        else{state.currentId=root.id;state.projTab='timeline'}
+        syncHash();render();
+      }else render();
+    };
+    tab.appendChild(x);
+    strip.appendChild(tab);
+  }
+  return strip;
 }
 /* 保存先フォルダ未設定の警告バナー（動画はフォルダにしか保存できないため） */
 function folderWarnBanner(root){
@@ -1455,8 +1478,8 @@ function renderBodyMain(){
   const cur=state.currentId?getNode(state.currentId):null;
   if(!cur){renderHome(s);return}
   const root=rootOf(cur);
-  /* プロジェクト内では上部タブを常に表示 */
-  s.appendChild(buildProjectTabs(root));
+  /* 下段：開いているタスクのタブ列（プロジェクトタブはヘッダへ移動） */
+  s.appendChild(buildTaskTabs(root));
   /* 保存先フォルダ未設定の警告 */
   const warn=folderWarnBanner(root);if(warn)s.appendChild(warn);
   if(cur.id===root.id&&!state.search.trim()){
