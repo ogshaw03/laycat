@@ -3785,6 +3785,9 @@ function openReel(){
       for(const p of (c.pending||[]))if(p.f!=null)ctx.fillRect((poff+p.f)*fw,10,Math.max(2.5,fw*pdur),5);
       poff+=clipFrames(c);
     });
+    /* キャッシュ済み（デコード済み・遅延なしで表示できる）クリップ範囲を最下部に青ライン表示 */
+    let coff=0;ctx.fillStyle='#3b82f6';
+    cs.forEach(c=>{const cf=clipFrames(c);if(isCached(c.url))ctx.fillRect(Math.round(coff*fw),H-3,Math.max(2,cf*fw),3);coff+=cf});
     /* プレイヘッド（全体位置） */
     const co=gOffset(reelUI.cur);
     const x=(co+dispF())*fw+fw/2;
@@ -3797,7 +3800,7 @@ function openReel(){
     let idx=0,off=0;
     while(idx<cs.length-1&&gf>=off+clipFrames(cs[idx])){off+=clipFrames(cs[idx]);idx++}
     const lf=gf-off;
-    if(idx!==reelUI.cur){reelUI.cur=idx;RV.pendSeek=lf;reelUI.loadCur(false)}
+    if(idx!==reelUI.cur){RV.scrubT=RV.scrub?lf:RV.scrubT;reelUI.cur=idx;RV.pendSeek=lf;reelUI.loadCur(false)} /* 跨ぐ瞬間に目的フレームを確定しプレイヘッドの飛びを防ぐ */
     else{RV.scrubT=RV.scrub?lf:RV.scrubT;seekRTr(lf)}
   }
   ftl.onpointerdown=e=>{RV.scrub=true;ftl.setPointerCapture(e.pointerId);video.pause();const gf=gFromX(e);RV.scrubT=-1;gSeek(gf);RV.last=-1};
@@ -3833,8 +3836,12 @@ function openReel(){
   anno.addEventListener('pointerdown',e=>{if(e.button!==2||!e.altKey||!RV.tool)return;e.preventDefault();anno.setPointerCapture(e.pointerId);const r=stage.getBoundingClientRect();rvSz={x:e.clientX,rl:e.clientX-r.left,rt:e.clientY-r.top,start:RV.tool==='erase'?RV.eraseW:RV.brushW,tool:RV.tool};rvShowRing()});
   anno.addEventListener('pointermove',e=>{if(!rvSz)return;const ns=Math.max(1,Math.min(200,rvSz.start+(e.clientX-rvSz.x)*0.4));if(rvSz.tool==='erase'){RV.eraseW=ns;liveOpt(eraseS,ns,'消し ')}else{RV.brushW=ns;liveOpt(brushS,ns,'ブラシ ')}drawAnno();rvShowRing()});
   anno.addEventListener('pointerup',()=>{if(rvSz){rvSz=null;szRing.style.display='none'}});
-  pF.onclick=()=>{video.pause();seekRTr(dispF()-1)};
-  nF.onclick=()=>{video.pause();seekRTr(dispF()+1)};
+  pF.onclick=()=>{video.pause();const f=dispF();
+    if(f<=0&&reelUI.cur>0){const pi=reelUI.cur-1;RV.scrub=false;RV.scrubT=-1;reelUI.cur=pi;RV.pendSeek=clipFrames(reelUI.clips[pi])-1;reelUI.loadCur(false)} /* クリップ先頭より前は前クリップ末尾へ */
+    else seekRTr(f-1)};
+  nF.onclick=()=>{video.pause();const f=dispF();
+    if(f>=RV.total-1&&reelUI.cur<reelUI.clips.length-1){RV.scrub=false;RV.scrubT=-1;reelUI.cur++;RV.pendSeek=0;reelUI.loadCur(false)} /* クリップ末尾より先は次クリップ先頭へ */
+    else seekRTr(f+1)};
   /* fps変更はこのリールのセッション内だけ（元動画データ v.fps は書き換えない） */
   fpsS.onchange=()=>{RV.FPS=parseInt(fpsS.value)||24;const c=reelUI.clips[reelUI.cur];if(c)c.fps=RV.FPS;RV.total=Math.max(1,Math.round((video.duration||0)*RV.FPS));RV.last=-1;drawFTL()};
   durS.onchange=()=>{drawAnno();drawFTL()};
@@ -3926,10 +3933,13 @@ function openReel(){
     if(e){e.used=++poolClock;return e.el}
     const v=mkVid();v.muted=true;v.src=url;try{v.load()}catch(_){}
     warmRest(v);
+    v.addEventListener('loadeddata',()=>{if(reelUI.drawFTL)reelUI.drawFTL()},{once:true}); /* キャッシュ完了でタイムラインの青ラインを更新 */
     vpool.set(url,{el:v,used:++poolClock});
     evictPool(url);
     return v;
   }
+  /* このクリップがデコード済み（プールに保持）でジャンプに遅延がない状態か */
+  function isCached(url){const e=vpool.get(url);return !!(e&&e.el&&e.el.readyState>=2)}
   /* プールが上限を超えたら、現在／次クリップ以外で最も古いものから破棄 */
   function evictPool(keepUrl){
     if(vpool.size<=POOL_MAX)return;
@@ -3968,8 +3978,10 @@ function openReel(){
     if(!c){hideBridge();activate(idleVid);reelRender();return}
     const target=getVid(c.url); /* キャッシュ済みなら即・デコード済みで先頭待機 */
     if(target===video){
-      /* 既に表示中：必要なときだけ先頭へ戻す */
-      hideBridge();if(video.currentTime>0.02){try{video.currentTime=0}catch(_){}}
+      /* 既に表示中：目的フレーム指定があればそこへ、なければ必要なときだけ先頭へ戻す */
+      hideBridge();
+      if(RV.pendSeek!=null){const ps=RV.pendSeek;RV.pendSeek=null;seekRTr(ps)}
+      else if(video.currentTime>0.02){try{video.currentTime=0}catch(_){}}
       if(auto)video.play().catch(()=>{});
     }else{
       /* 未デコードの新規クリップのみ、差替え中の黒点滅を直前フレームで隠す
@@ -3978,8 +3990,11 @@ function openReel(){
         try{bridge.width=video.videoWidth;bridge.height=video.videoHeight;bridge.getContext('2d').drawImage(video,0,0);bridge.style.display='block';reelWin.clearTimeout(reelUI.bridgeTO);reelUI.bridgeTO=reelWin.setTimeout(hideBridge,900)}catch(_){hideBridge()}
       }else hideBridge();
       activate(target);
-      if(video.currentTime>0.02){try{video.currentTime=0}catch(_){}}
       RV.total=Math.max(1,Math.round((video.duration||0)*RV.FPS));fitAnno();RV.last=-1;
+      const ps=RV.pendSeek;
+      if(ps!=null&&video.readyState>=1){RV.pendSeek=null;seekRTr(ps)} /* 目的フレームへ即シーク（メタデータ既知＝キャッシュ済み時） */
+      else if(ps==null&&video.currentTime>0.02){try{video.currentTime=0}catch(_){}} /* 通常切替は先頭へ */
+      /* ps!=null かつ readyState<1（新規）の場合は loadedmetadata リスナが適用 */
       if(auto)video.play().catch(()=>{});else video.pause();
     }
     preloadNext(); /* 次クリップを裏でキャッシュ */
