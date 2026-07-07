@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layna アクセス管理コンソール</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,'Segoe UI',sans-serif;background:#0d0d0f;color:#e8e8ec;font-size:14px;line-height:1.6}
+  .top{position:sticky;top:0;background:#141416;border-bottom:1px solid #2a2a2f;padding:14px 20px;display:flex;align-items:center;gap:12px;z-index:5}
+  .logo{font-weight:800;font-size:18px;letter-spacing:.5px}
+  .logo b{color:#4da6ff}
+  .top .sub{color:#8a8a99;font-size:12px}
+  .top .sp{flex:1}
+  .who{display:flex;align-items:center;gap:8px;font-size:12px}
+  .who img{width:26px;height:26px;border-radius:50%}
+  .wrap{max-width:920px;margin:0 auto;padding:22px 20px 60px}
+  .card{background:#141416;border:1px solid #23232a;border-radius:12px;padding:18px 20px;margin-bottom:18px}
+  h2{font-size:14px;margin:0 0 4px}
+  .hint{color:#8a8a99;font-size:12px;margin:0 0 12px}
+  label.row{display:flex;align-items:center;gap:10px;margin:10px 0}
+  textarea{width:100%;min-height:96px;resize:vertical;background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;color:#e8e8ec;padding:10px 12px;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.7}
+  textarea:focus{outline:none;border-color:#3a6bff}
+  .field{margin:14px 0}
+  .field .lab{font-weight:600;font-size:13px;margin-bottom:2px}
+  .field .desc{color:#8a8a99;font-size:11px;margin-bottom:6px}
+  .btn{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;color:#e8e8ec;padding:9px 16px;font-size:13px;cursor:pointer;font-family:inherit}
+  .btn:hover{border-color:#3a3a44}
+  .btn.primary{background:#2f6bff;border-color:#2f6bff;font-weight:600}
+  .btn.primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:transparent}
+  .actions{display:flex;gap:10px;align-items:center;margin-top:6px}
+  .gate{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+  .gate .logo{font-size:34px}
+  .gbtn{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#111;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer}
+  .gg{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;background:#4285F4;color:#fff;border-radius:3px;font-weight:800}
+  .status{font-size:12px;color:#8a8a99;margin-top:6px}
+  .ok{color:#5affa0}.err{color:#ff7a7a}
+  .banner{background:#2a1f12;border:1px solid #5a3d1a;color:#e0b070;border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:16px}
+  code{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:4px;padding:1px 6px;font-size:12px}
+  details{margin-top:10px}summary{cursor:pointer;color:#8a8a99;font-size:12px}
+  pre{background:#1c1c1f;border:1px solid #2a2a2f;border-radius:8px;padding:12px;overflow:auto;font-size:12px}
+  .readonly{opacity:.6;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="logo">La<b>y</b>na</span><span class="sub">アクセス管理コンソール</span>
+  <span class="sp"></span>
+  <span class="who" id="who"></span>
+  <button class="btn ghost" id="logout" style="display:none">ログアウト</button>
+</div>
+
+<div id="app"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* Layna 本体と同じ Firebase プロジェクト（animref-ef532）を使用 */
+const firebaseConfig={apiKey:"AIzaSyASqL2Qp8sGrkzHz7J_HhE6QXntAZOO7RE",authDomain:"animref-ef532.firebaseapp.com",projectId:"animref-ef532",storageBucket:"animref-ef532.firebasestorage.app",messagingSenderId:"1029274074603",appId:"1:1029274074603:web:f0ddc3eb69e35a47276dae"};
+const CFG_PATH=['laynaAccess','config']; /* Firestore ドキュメント（Layna 本体が読むのと同じパス） */
+
+const app=initializeApp(firebaseConfig);
+const auth=getAuth(app);
+const provider=new GoogleAuthProvider();
+const db=getFirestore(app);
+
+const $=s=>document.querySelector(s);
+const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const lines=arr=>Array.isArray(arr)?arr.join('\n'):'';
+const parse=v=>String(v||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+const lc=s=>String(s||'').toLowerCase();
+
+let me=null,cfg=null;
+
+function renderLogin(msg){
+  $('#who').textContent='';$('#logout').style.display='none';
+  const app=$('#app');app.innerHTML='';
+  const g=el('div','gate');
+  g.appendChild(el('div','logo','La<b>y</b>na'));g.querySelector('.logo').innerHTML='La<b>y</b>na';
+  g.appendChild(el('div','sub','アクセス管理コンソール — 管理者用'));
+  const b=el('button','gbtn');b.innerHTML='<span class="gg">G</span> Google でログイン';
+  b.onclick=async()=>{try{await signInWithPopup(auth,provider)}catch(e){status('ログイン失敗: '+(e&&e.message),'err')}};
+  g.appendChild(b);
+  if(msg)g.appendChild(el('div','status err',msg));
+  app.appendChild(g);
+}
+
+function status(msg,cls){const s=$('#saveStatus');if(s){s.textContent=msg||'';s.className='status '+(cls||'')}}
+
+async function loadCfg(){
+  try{const snap=await getDoc(doc(db,...CFG_PATH));return snap.exists()?snap.data():null}
+  catch(e){return {__error:e&&e.message}}
+}
+
+function isAdmin(c,email){
+  if(!c)return false;
+  return (c.adminEmails||[]).some(x=>lc(x)===lc(email))||(c.operatorEmails||[]).some(x=>lc(x)===lc(email));
+}
+
+async function renderApp(){
+  $('#who').innerHTML='';
+  if(me.photoURL){const img=document.createElement('img');img.src=me.photoURL;img.referrerPolicy='no-referrer';$('#who').appendChild(img)}
+  $('#who').appendChild(el('span',null,me.email));
+  $('#logout').style.display='';
+
+  cfg=await loadCfg();
+  const app=$('#app');app.innerHTML='';
+  const wrap=el('div','wrap');app.appendChild(wrap);
+
+  // Firestore 未設定/エラー時の案内
+  if(cfg&&cfg.__error){
+    wrap.appendChild(banner('Firestore を読み込めませんでした（'+cfg.__error+'）。Firebase コンソールで Firestore を有効化し、セキュリティルールを設定してください。下部の「セットアップ」を参照。'));
+    cfg=null;
+  }
+
+  const bootstrap=!cfg; // ドキュメントが無い＝初期化前
+  const admin=bootstrap||isAdmin(cfg,me.email);
+
+  if(!admin){
+    wrap.appendChild(banner('あなたのアカウント（'+me.email+'）は管理者ではありません。編集するには adminEmails に登録が必要です。'));
+  }
+  if(bootstrap){
+    wrap.appendChild(banner('アクセス設定がまだありません。初回はあなた（'+me.email+'）を管理者として初期化できます。「保存」で作成されます。'));
+    cfg={authRequired:true,allowedEmails:[],adminEmails:[me.email],operatorEmails:[],allowedDomains:[]};
+  }
+
+  const card=el('div','card');
+  card.appendChild(el('h2',null,'ツールへのアクセス権'));
+  card.appendChild(el('p','hint','Layna 本体はログイン時にこの設定（Firestore: laynaAccess/config）を読み、許可されたメールのみ入室できます。1行に1件で入力してください。'));
+
+  // authRequired
+  const arWrap=el('label','row');
+  const ar=document.createElement('input');ar.type='checkbox';ar.id='authRequired';ar.checked=cfg.authRequired!==false;
+  arWrap.appendChild(ar);arWrap.appendChild(el('span',null,'認証を必須にする（authRequired）'));
+  card.appendChild(arWrap);
+
+  const fields=[
+    ['adminEmails','管理者（admin）','この設定を編集できる管理者のメール。承認や管理操作の権限。'],
+    ['operatorEmails','オペレーター（operator）','管理者に準ずる運用担当のメール。'],
+    ['allowedEmails','許可メンバー（member）','ログインを許可する一般メンバーのメール。'],
+    ['allowedDomains','許可ドメイン','このドメインのメール全員を許可（例: studio.jp）。@は不要。']
+  ];
+  const tas={};
+  for(const [key,lab,desc] of fields){
+    const f=el('div','field');
+    f.appendChild(el('div','lab',lab+'（'+key+'）'));
+    f.appendChild(el('div','desc',desc));
+    const ta=document.createElement('textarea');ta.value=lines(cfg[key]);ta.spellcheck=false;tas[key]=ta;
+    f.appendChild(ta);card.appendChild(f);
+  }
+
+  const actions=el('div','actions');
+  const save=el('button','btn primary','保存');save.id='saveBtn';
+  const reload=el('button','btn ghost','再読込');
+  const stat=el('span','status');stat.id='saveStatus';
+  actions.appendChild(save);actions.appendChild(reload);actions.appendChild(stat);
+  card.appendChild(actions);
+  wrap.appendChild(card);
+
+  if(!admin){card.classList.add('readonly');save.disabled=true}
+
+  reload.onclick=()=>renderApp();
+  save.onclick=async()=>{
+    const data={
+      authRequired:ar.checked,
+      adminEmails:parse(tas.adminEmails.value),
+      operatorEmails:parse(tas.operatorEmails.value),
+      allowedEmails:parse(tas.allowedEmails.value),
+      allowedDomains:parse(tas.allowedDomains.value).map(d=>d.replace(/^@/,'')),
+      updatedBy:me.email,updatedAt:new Date().toISOString()
+    };
+    if(!data.adminEmails.length){status('管理者(adminEmails)を最低1件は残してください（自分がロックアウトされます）','err');return}
+    save.disabled=true;status('保存中…');
+    try{await setDoc(doc(db,...CFG_PATH),data);status('保存しました ✓','ok');cfg=data}
+    catch(e){status('保存失敗: '+(e&&e.message)+'（Firestore のセキュリティルールを確認してください）','err')}
+    finally{save.disabled=false}
+  };
+
+  wrap.appendChild(setupCard());
+}
+
+function banner(text){return el('div','banner',text)}
+
+function setupCard(){
+  const c=el('div','card');
+  c.appendChild(el('h2',null,'セットアップ（初回のみ・Firebase コンソール）'));
+  c.appendChild(el('p','hint','このコンソールと Layna 本体は Firestore の laynaAccess/config ドキュメントを共有します。以下を一度だけ設定してください。'));
+  const d=document.createElement('details');
+  d.appendChild(el('summary',null,'必要な Firestore セキュリティルール（クリックで表示）'));
+  const pre=document.createElement('pre');
+  pre.textContent=
+`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // アクセス設定：ログイン済みなら読取OK。書込は管理者のみ。
+    match /laynaAccess/config {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.token.email in resource.data.adminEmails;
+      // 初回（ドキュメント未作成）は誰でも作成可 → 作成者を admin に入れる運用
+      allow create: if request.auth != null;
+    }
+  }
+}`;
+  d.appendChild(pre);
+  c.appendChild(d);
+  c.appendChild(el('p','hint','手順: ① Firebase コンソールで Firestore Database を有効化 → ② 上記ルールを設定 → ③ このコンソールで初回保存（あなたが管理者になります）→ ④ 以降はここでメンバーを追加。Layna 本体はログイン時にこの設定を自動反映します（取得失敗時は同梱の access.json にフォールバック）。'));
+  return c;
+}
+
+$('#logout').onclick=()=>signOut(auth);
+
+onAuthStateChanged(auth,async u=>{
+  if(!u){me=null;renderLogin();return}
+  me={email:u.email,name:u.displayName||u.email,photoURL:u.photoURL};
+  try{await renderApp()}catch(e){renderLogin('初期化エラー: '+(e&&e.message))}
+});
+</script>
+</body>
+</html>
