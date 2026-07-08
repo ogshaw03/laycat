@@ -815,7 +815,7 @@ const storage={
 /* ---------- 状態 / DB ---------- */
 let DB=null;let curUploadUI=null;
 let REG=[]; /* 接続プロジェクト一覧（このユーザーが使うプロジェクト）: [{id,name,folderName}] */
-const state={currentId:null,search:'',expanded:new Set(),frameOrder:false,tabDrawers:{},openTasks:[]};
+const state={currentId:null,search:'',expanded:new Set(),tabDrawers:{},openTasks:[]};
 function defaultDb(){return{version:3,nodes:[],reels:[],notifications:[],submits:[]}}
 /* プロジェクト（ルート）ID を求める */
 function projectIdOf(nodeId){const n=getNode(nodeId);return n?rootOf(n).id:null}
@@ -2211,10 +2211,7 @@ function renderReviewBody(s,cur){
   const ll=el('div','section-label');ll.appendChild(el('span',null,'動画FBログ / ディレクターチェック'));
   const acts=el('div','acts');
   const addVid=el('button','btn btn-primary btn-sm','＋ 動画');addVid.title='この工程に動画・画像を追加';addVid.onclick=()=>triggerUpload(cur);acts.appendChild(addVid);
-  const fo=el('button','btn btn-ghost btn-sm'+(state.frameOrder?' tool active':''),state.frameOrder?'フレーム順 ✓':'フレーム順');
-  fo.title='コメントをフレーム番号順に表示（Fチップでタイル内動画がそのフレームへ移動）';
-  fo.onclick=()=>{state.frameOrder=!state.frameOrder;renderBody();resolveThumbs()};
-  acts.appendChild(fo);ll.appendChild(acts);
+  ll.appendChild(acts); /* コメントは常にフレーム順（Fチップでタイル内動画がそのフレームへ移動） */
   s.appendChild(ll);
   const prog=el('div','uploading hidden');const bar=el('div','bar');const bi=el('i');bar.appendChild(bi);const pct=el('span',null,'処理中...');prog.appendChild(bar);prog.appendChild(pct);
   curUploadUI={prog,bi,pct};
@@ -2601,7 +2598,8 @@ function logItem(node,v){
   side.appendChild(el('div','log-side-head','フレームコメント / FB'));
   const notes=el('div','log-side-list');
   let arr=v.review.notes.filter(n=>n.frame!=null&&!noteEmbedOnly(n));
-  if(state.frameOrder)arr.sort((a,b)=>((a.frame??1e9)-(b.frame??1e9))||String(a.time).localeCompare(String(b.time)));
+  /* 常にフレーム番号順（同フレームは時系列）で並べる */
+  arr.sort((a,b)=>((a.frame??1e9)-(b.frame??1e9))||String(a.time).localeCompare(String(b.time)));
   if(!arr.length)notes.appendChild(el('div','log-empty-note','フレームコメントはまだありません。FB画面（⤢）または下の入力から。'));
   for(const n of arr)notes.appendChild(noteBlock(v,n,{refresh,onSeek:seekInline,shot}));
   side.appendChild(notes);
