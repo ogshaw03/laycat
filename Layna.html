@@ -3983,6 +3983,10 @@ function openReel(){
    /* ショットリスト（左） */
    +'.rside{width:320px;border-right:1px solid rgba(96,165,255,.5);box-shadow:1px 0 10px rgba(96,165,255,.14);background:#141416;display:flex;flex-direction:column;min-height:0;flex-shrink:0}'
    +'.rside-h{font-size:10px;letter-spacing:1px;color:#5a5a6a;text-transform:uppercase;padding:10px 10px 6px;display:flex;justify-content:space-between;align-items:center}'
+   +'.rfilter{display:flex;gap:6px;padding:0 10px 8px}'
+   +'.rfsel{flex:1;min-width:0;background:#1c1c1f;border:1px solid #2a2a2f;color:#e8e8ec;border-radius:6px;padding:5px 6px;font-size:11px;font-family:inherit;cursor:pointer}'
+   +'.rfsel:focus{outline:none;border-color:#3a3a42}'
+   +'.snode .rstat{font-size:9px;font-weight:700;border:1px solid;border-radius:4px;padding:0 5px;white-space:nowrap}'
    +'.rlist{flex:1;overflow-y:auto;padding:0 10px 10px;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));align-content:start}'
    +'.snode{border:1px solid #2a2a2f;overflow:hidden;background:#1c1c1f;display:flex;flex-direction:column}'
    +'.snode:hover{border-color:rgba(96,165,255,.7);box-shadow:0 0 8px rgba(96,165,255,.2)}'
@@ -4067,6 +4071,8 @@ function openReel(){
   const menubar=ce(d,'div','menubar');
   const fileMi=ce(d,'div','mi','File');menubar.appendChild(fileMi);
   const fileDD=ce(d,'div','menu-dd');fileMi.appendChild(fileDD);
+  const shotMi=ce(d,'div','mi','Shot');menubar.appendChild(shotMi);
+  const shotDD=ce(d,'div','menu-dd');shotMi.appendChild(shotDD);
   const reelTitle=ce(d,'span','reel-title','未保存のリール');menubar.appendChild(reelTitle);
   d.body.appendChild(menubar);
   /* ヘッダ */
@@ -4080,10 +4086,17 @@ function openReel(){
   d.body.appendChild(hd);
   /* 4カラム: ショットリスト | メイン | レイヤー | コメント */
   const rowEl=ce(d,'div');rowEl.style.cssText='flex:1;display:flex;min-height:0';
-  const rside=ce(d,'div','rside');
+  const rside=ce(d,'div','rside');rside.style.display='none'; /* 既定は非表示。Shot メニューから読み込みで表示 */
   const rsh=ce(d,'div','rside-h');rsh.appendChild(ce(d,'span',null,'ショットリスト'));
   const rref=ce(d,'button','btn','↻');rref.title='リストを更新';rsh.appendChild(rref);
+  const rcls=ce(d,'button','btn','✕');rcls.title='リストを閉じる';rsh.appendChild(rcls);
   rside.appendChild(rsh);
+  /* フィルタ：ステータス・作業担当者 */
+  const rfilter=ce(d,'div','rfilter');
+  const fStatus=d.createElement('select');fStatus.className='rfsel';
+  const fAssignee=d.createElement('select');fAssignee.className='rfsel';
+  rfilter.appendChild(fStatus);rfilter.appendChild(fAssignee);
+  rside.appendChild(rfilter);
   const rlist=ce(d,'div','rlist');rside.appendChild(rlist);
   const maincol=ce(d,'div');maincol.style.cssText='flex:1;display:flex;flex-direction:column;min-width:300px';
   rowEl.appendChild(rside);rowEl.appendChild(maincol);
@@ -4104,7 +4117,7 @@ function openReel(){
   /* クリップ切替時の黒フレーム点滅を防ぐ橋渡し用キャンバス（直前フレームを保持） */
   const bridge=ce(d,'canvas');bridge.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:3;display:none;pointer-events:none';stage.appendChild(bridge);
   const hideBridge=()=>{bridge.style.display='none'};
-  const empty=ce(d,'div','empty');empty.innerHTML='クリップがありません。<br>左のショットリスト、またはメインの REEL ボタンで追加してください。';stage.appendChild(empty);
+  const empty=ce(d,'div','empty');empty.innerHTML='クリップがありません。<br>上部の Shot メニューから「ショットを読み込み」、またはメインの REEL ボタンで追加してください。';stage.appendChild(empty);
   maincol.appendChild(stage);
   /* コントロール */
   const ctr=ce(d,'div','ctr');
@@ -4594,7 +4607,7 @@ function openReel(){
   clearBtn.onclick=()=>{if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。すべてのクリップを外すと失われます。続けますか？')){return}if(!reelWin.confirm('すべてのクリップを外しますか？'))return;reelUI.clips=[];reelUI.cur=0;clearPool();resetView();reelRender();updReelTitle();updUnsent()};
   /* ==== File メニュー（新規 / 開く / 保存 / 名前を付けて保存）— AE/Maya風 ==== */
   function updReelTitle(){const r=reelUI.reelId?DB.reels.find(x=>x.id===reelUI.reelId):null;reelTitle.textContent=(r?r.name:'未保存のリール')+(reelUI.clips.length?'':'（空）')}
-  function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
+  function closeMenu(){fileMi.classList.remove('open');fileDD.classList.remove('show');shotMi.classList.remove('open');shotDD.classList.remove('show')} /* ドロップダウンのみ閉じる */
   function closeOpenOv(){const ov=d.getElementById('reelOpenOv');if(ov)ov.remove()}
   function doNew(){if(hasUnsent()&&!reelWin.confirm('未送信の記入があります。新規リールを作ると失われます。続けますか？'))return;reelUI.clips=[];reelUI.cur=0;reelUI.reelId=null;clearPool();resetView();reelRender();updReelTitle();updUnsent()}
   /* リール保存（File メニュー / Ctrl+S から）。ヘッダのボタンは廃止済み */
@@ -4698,10 +4711,28 @@ function openReel(){
   })();
   /* ショットリスト（メインのツリーからレビューを選んで追加） */
   function pathStr(id){const p=pathOf(id);return p.slice(0,-1).map(n=>n.name).join(' / ')||'（トップ）'}
+  /* フィルタ選択肢を構築（現在の選択を保持） */
+  function populateReelFilters(revs){
+    const stMap=new Map();
+    for(const n of revs){const id=nodeStatus(n);if(id==='empty')continue;if(!stMap.has(id))stMap.set(id,stInfo(n).label)}
+    const curS=reelUI.filterStatus||'';
+    fStatus.innerHTML='';const o0=d.createElement('option');o0.value='';o0.textContent='ステータス: すべて';fStatus.appendChild(o0);
+    for(const [id,label] of stMap){const o=d.createElement('option');o.value=id;o.textContent=label;fStatus.appendChild(o)}
+    if(!stMap.has(curS))reelUI.filterStatus='';fStatus.value=reelUI.filterStatus||'';
+    const asMap=new Map();
+    for(const n of revs){const id=n.assignee;if(!id)continue;const k=String(id).toLowerCase();if(!asMap.has(k)){const m=memberById(rootOf(n),id);asMap.set(k,{id,name:m?(m.name||m.id):id})}}
+    const curA=(reelUI.filterAssignee||'').toLowerCase();
+    fAssignee.innerHTML='';const a0=d.createElement('option');a0.value='';a0.textContent='作業担当: すべて';fAssignee.appendChild(a0);
+    for(const v of asMap.values()){const o=d.createElement('option');o.value=v.id;o.textContent='作業: '+v.name;fAssignee.appendChild(o)}
+    if(!asMap.has(curA))reelUI.filterAssignee='';fAssignee.value=reelUI.filterAssignee||'';
+  }
   function buildShotList(){
     rlist.innerHTML='';
-    const revs=DB.nodes.filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
-    if(!revs.length){rlist.appendChild(ce(d,'div','pth','動画のあるタスクがありません'));return}
+    const allRevs=DB.nodes.filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
+    populateReelFilters(allRevs);
+    const fs=reelUI.filterStatus||'',fa=(reelUI.filterAssignee||'').toLowerCase();
+    const revs=allRevs.filter(n=>(!fs||nodeStatus(n)===fs)&&(!fa||String(n.assignee||'').toLowerCase()===fa));
+    if(!revs.length){rlist.appendChild(ce(d,'div','pth',allRevs.length?'フィルタに一致するショットがありません':'動画のあるタスクがありません'));return}
     for(const n of revs){
       const vids=n.versions.filter(x=>x.type==='video');
       const latest=vids[vids.length-1];
@@ -4716,8 +4747,9 @@ function openReel(){
       const tg=ce(d,'button','addb','▸');tg.title='中の動画（バージョン）を表示';
       r2.appendChild(tg);
       const sp=ce(d,'span','sp2');sp.appendChild(icoEl('film',d));sp.appendChild(d.createTextNode(' '+n.name));r2.appendChild(sp);
-      r2.appendChild(ce(d,'span','pth',vids.length+' バージョン'));
+      const si=stInfo(n);const stChip=ce(d,'span','rstat',si.label);stChip.style.color=si.color;stChip.style.borderColor=si.color;r2.appendChild(stChip);
       bd.appendChild(r2);
+      const meta2=ce(d,'div','pth');const am=n.assignee?memberById(rootOf(n),n.assignee):null;meta2.textContent=vids.length+' バージョン'+(n.assignee?'・作業: '+(am?(am.name||am.id):n.assignee):'');bd.appendChild(meta2);
       card.appendChild(bd);
       /* ショットの中の動画（全バージョン）を新しい順に辿って個別に追加できる */
       const vl=ce(d,'div','vl');vl.style.display='none';
@@ -4739,7 +4771,16 @@ function openReel(){
     }
   }
   rref.onclick=buildShotList;
-  buildShotList();
+  rcls.onclick=()=>{rside.style.display='none'};
+  fStatus.onchange=()=>{reelUI.filterStatus=fStatus.value||'';buildShotList()};
+  fAssignee.onchange=()=>{reelUI.filterAssignee=fAssignee.value||'';buildShotList()};
+  /* Shot メニュー：ショットリストの表示/更新/非表示 */
+  const shotItem=(label,fn)=>{const it=ce(d,'div','item');it.appendChild(ce(d,'span',null,label));it.onclick=e=>{e.stopPropagation();closeMenu();fn()};shotDD.appendChild(it);return it};
+  shotItem('ショットを読み込み',()=>{buildShotList();rside.style.display=''});
+  shotItem('リストを更新',()=>{buildShotList();rside.style.display=''});
+  shotDD.appendChild(ce(d,'div','sep'));
+  shotItem('リストを閉じる',()=>{rside.style.display='none'});
+  shotMi.onclick=e=>{e.stopPropagation();const willOpen=!shotDD.classList.contains('show');closeMenu();if(willOpen){shotMi.classList.add('open');shotDD.classList.add('show')}};
   reelUI.drawFTL=drawFTL;
   buildLayerPanel();reelNotes();
   reelRender();
