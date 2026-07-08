@@ -2356,7 +2356,7 @@ function fillReviewDrawer(){
   back._p.textContent=(shot?pathOf(shot.id).slice(1).map(x=>x.name).join(' / '):pathOf(node.id).slice(1,-1).map(x=>x.name).join(' / '))||rootOf(node).name;
   back._acts.innerHTML='';
   /* ＋タブに追加：現在選択中の工程をタスクタブに追加 */
-  const openB=el('button','btn btn-open btn-sm','＋ タブに追加');openB.title='この工程のタスクページをタブとして開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
+  const openB=el('button','btn btn-open btn-sm','タブに追加');openB.title='この工程のタスクページをタブとして開く';openB.onclick=()=>{const id=state.drawer&&state.drawer.id;closeReviewDrawer();if(id)go(id)};back._acts.appendChild(openB);
   back.classList.add('drawer-review');
   const body=back._body;body.innerHTML='';curUploadUI=null;
   /* 上部：各工程のタイル（サブミットの右スライドと同形）。クリックで下のタスクページを切替 */
@@ -2427,7 +2427,7 @@ function fillSubmitDrawer(){
     if(!n||n.type!=='review')return;
     const hd=el('div','sub-detail-hd');
     hd.appendChild(elIco('span','ttl','film',(shotOf(n)?shotOf(n)+' / ':'')+n.name+' — タスクページ'));
-    const openB=el('button','btn btn-open btn-sm','＋ タブに追加');openB.title='このタスクページをタブとして開く';openB.onclick=()=>{closeReviewDrawer();go(n.id)};hd.appendChild(openB);
+    const openB=el('button','btn btn-open btn-sm','タブに追加');openB.title='このタスクページをタブとして開く';openB.onclick=()=>{closeReviewDrawer();go(n.id)};hd.appendChild(openB);
     detail.appendChild(hd);
     const inner=el('div','sub-detail-body');renderReviewBody(inner,n);detail.appendChild(inner);
     resolveThumbs();
