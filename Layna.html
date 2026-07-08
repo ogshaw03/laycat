@@ -1118,7 +1118,7 @@ function scanMentionsForMe(){
         ?(me.ids.has(String(x.id).toLowerCase())||(me.name&&x.name&&String(x.name).trim()===me.name))
         :(x.type==='role'&&me.roles.has(String(x.id))));
     const consider=(obj,author,text,nodeId)=>{if(!obj||!obj.mentions||!obj.mentions.length||!hit(obj.mentions))return;
-      if((author||'')===currentUser())return; /* 自分の発言は通知しない */
+      /* 自分宛メンションは自分の発言でも通知（@自分メモ・動作確認のため） */
       const key='mn:'+(obj.id||'')+':'+(obj.time||'')+':'+nodeId;if(seen.has(key))return;seen.add(key);
       pending.push({title:'メンションされました',text:(author||'誰か')+'：'+String(text||'').replace(/\s+/g,' ').slice(0,80),nodeId})};
     for(const n of descendants(root.id)){
