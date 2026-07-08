@@ -895,6 +895,14 @@ function isDoneStatus(root,statusId){
   const s=projStatuses(root).find(x=>x.id===statusId);
   return !!(s&&/完了|承認|上がり|フィックス|ok\b|done|fix|approve|complete/i.test(s.label));
 }
+/* チェック待ち（未チェック）判定：まだ担当が判断していない＝初期ステータス（＝プロジェクトの先頭ステータス）。
+   OK / リテイク / NG など担当が判断済みのものは「チェック待ち」ではない。 */
+function isAwaitingCheck(root,statusId){
+  if(!statusId||statusId==='empty')return false;
+  if(statusId==='pending')return true;
+  const sts=projStatuses(root);
+  return !!(sts.length&&statusId===sts[0].id);
+}
 /* プロジェクト（ルート）が完了か。動画のあるレビューが全て完了ステータスなら完了 */
 function projectDone(root){
   const reviews=[root,...descendants(root.id)].filter(n=>n.type==='review'&&n.versions&&n.versions.length);
@@ -1829,7 +1837,7 @@ function renderProjCheck(main,root){
   refresh.onclick=()=>{state.checkReset=true;renderBody();resolveThumbs()};head.appendChild(refresh);
   main.appendChild(head);
   /* 対象＝配下の工程(review)で、動画があり、まだ完了していないもの（チェック担当の有無は問わない） */
-  const pendingNow=descendants(root.id).filter(n=>n.type==='review'&&n.versions&&n.versions.length&&!isDoneStatus(root,nodeStatus(n)));
+  const pendingNow=descendants(root.id).filter(n=>n.type==='review'&&n.versions&&n.versions.length&&isAwaitingCheck(root,nodeStatus(n)));
   const pendingIds=new Set(pendingNow.map(n=>n.id));
   /* スナップショット：タブに入った時（またはチェック待ちタブ再クリック/更新）に確定。
      以後のステータス変更ではリストからカットを消さず、済みは薄く表示のまま残す（誤操作防止）。 */
@@ -1883,7 +1891,7 @@ function renderProjCheck(main,root){
     const t=el('div','tl-title');
     const stg=el('span','tl-stage',n.name);stg.style.background=stageColor(n.name);t.appendChild(stg); /* 工程 */
     const sp=buildStatusSelect(n);sp.onclick=e=>e.stopPropagation();t.appendChild(sp); /* ステータス変更（行クリックの遷移を抑止） */
-    if(done)t.appendChild(el('span','chk-done-chip','✓ チェック済（更新で整理）'));
+    if(done)t.appendChild(el('span','chk-done-chip','✓ 判定済（更新で整理）'));
     bd.appendChild(t);
     const ab=taskAssignBadges(n);if(ab)bd.appendChild(ab); /* 作業/チェック担当 */
     bd.appendChild(el('div','tl-meta',lv?('最新: '+lv.v.name+'　by '+(lv.v.uploadedBy||'-')+'・'+fmt(lv.v.uploadedAt)):'動画なし'));
