@@ -3272,7 +3272,7 @@ function openReview(nodeId,versionId,opts){
     b.onclick=async()=>{node.status=stt.id;await persist();updSt()};
     top.appendChild(b);
   }
-  if(isVideo){const rb=el('button','btn btn-ghost btn-sm');rb.appendChild(icoEl('reel'));rb.title='REEL に送る';rb.onclick=()=>sendToReel(node,v);top.appendChild(rb)}
+  if(isVideo){const rb=elIco('button','btn btn-ghost btn-sm','reel',' REELに送る');rb.title='この動画を REEL に送る';rb.onclick=()=>sendToReel(node,v);top.appendChild(rb)}
   const delBtn=el('button','btn btn-danger btn-sm');delBtn.appendChild(icoEl('trash'));delBtn.title='このバージョンを削除';
   delBtn.onclick=async()=>{if(!confirm(v.name+' を削除しますか？'))return;await storage.delMedia(v.file);await storage.delMedia(v.thumb);node.versions=node.versions.filter(x=>x.id!==v.id);node.thumbnail=node.versions.length?node.versions[node.versions.length-1].thumb:null;await persist();close()};
   top.appendChild(delBtn);
