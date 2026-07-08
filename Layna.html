@@ -711,7 +711,7 @@ textarea.form-input{height:70px;resize:vertical}
 <header class="header">
   <div class="logo"><span class="name">La<b>y</b>na</span><span class="ver">PROJECT</span></div>
   <button class="home-btn" id="homeBtn" title="トップへ">◐</button>
-  <div class="search-wrap"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
+  <div class="search-wrap" style="display:none"><span class="si">⌕</span><input id="searchInput" type="text" placeholder="この階層を検索..." /></div>
   <div class="header-actions">
     <button class="btn btn-ghost" id="reelBtn" title="REEL — 動画を並べて順番に見るシーケンスプレイヤー（別ウィンドウ）"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2"/><path d="M10 3v3M10 14v3M3 10h3M14 10h3"/></svg>REEL</button>
     <button class="btn btn-ghost" id="submitBtn" title="サブミット — 複数ショットの提出をまとめてレビュー"><svg class="ico" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="14" height="5" rx="1"/><rect x="3" y="11" width="14" height="5" rx="1"/></svg>サブミット</button>
@@ -1527,7 +1527,7 @@ async function disconnectProject(id){
 function updateHeaderForContext(){
   const home=!state.currentId;
   const setD=(sel,show)=>{const e=$(sel);if(e)e.style.display=show?'':'none'};
-  setD('#homeBtn',!home);setD('.search-wrap',!home);setD('#reelBtn',!home);setD('#submitBtn',!home);
+  setD('#homeBtn',!home);setD('#reelBtn',!home);setD('#submitBtn',!home); /* ヘッダ検索は撤去（サイドバー検索に一本化） */
   setD('#mainHead',!home);setD('#breadcrumb',!home);
   /* 保存先インジケータはプロジェクト内でのみ表示 */
   setD('#folderStatus',!home);updateFolderStatus();
