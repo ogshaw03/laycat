@@ -1845,8 +1845,10 @@ function renderProjCheck(main,root){
   const list=el('div','tl');
   for(const n of hits){
     const lv=latestVideoVersionUnder(n.id);
-    const it=el('div','tl-item');it.title='クリックでタスクページへ';it.onclick=()=>go(n.id);
-    const th=el('img','tl-thumb');if(lv&&lv.v.thumb)th.dataset.ref=lv.v.thumb;it.appendChild(th);
+    const it=el('div','tl-item');it.title='クリックでタスクページをタブ表示（動画タイルはアノテーション表示）';it.onclick=()=>go(n.id);
+    const th=el('img','tl-thumb');if(lv&&lv.v.thumb)th.dataset.ref=lv.v.thumb;
+    if(lv){th.title='クリックでアノテーションウィンドウを開く';th.onclick=ev=>{ev.stopPropagation();openReview(lv.node.id,lv.v.id)}} /* 動画タイルはアノテーション表示 */
+    it.appendChild(th);
     const bd=el('div','tl-body');
     bd.appendChild(el('div','tl-path',shotOf(n)||n.name)); /* ショット名 */
     const t=el('div','tl-title');
