@@ -100,6 +100,13 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .task-topbar .tt-head{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
 .task-topbar .tt-proc{font-family:var(--font-head);font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;margin:0}
 .task-topbar .tt-shot{font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 9px;flex-shrink:0}
+/* 上部バーの作業者/チェック者ピッカー（設定ボタンの左に横並び） */
+.task-topbar .tt-asg.form-row{margin:0;display:flex;flex-direction:row;align-items:center;gap:6px;width:auto}
+.task-topbar .tt-asg .form-label{margin:0;font-size:10px;color:var(--text3);white-space:nowrap}
+.task-topbar .tt-asg .mps{width:130px}
+.task-topbar .tt-asg .mps-input{font-size:12px;padding:5px 8px}
+.task-topbar .tt-asg-a .mps-input{border-left:3px solid var(--green)}
+.task-topbar .tt-asg-r .mps-input{border-left:3px solid var(--amber)}
 .breadcrumb{display:flex;align-items:center;gap:6px;padding:12px 20px 0;color:var(--text3);font-size:13px;flex-wrap:wrap}
 .breadcrumb .sep{opacity:.5}
 .breadcrumb .cur{color:var(--text)}
@@ -2266,9 +2273,13 @@ function renderReviewBody(s,cur){
   const tst=stInfo(cur);const tbg=el('span','badge',tst.label);tbg.style.background=hexA(tst.color,.18);tbg.style.color=tst.color;h1.appendChild(tbg);
   h1.appendChild(elIco('span','type-chip','film','タスク'));
   topbar.appendChild(h1);
-  const tab=taskAssignBadges(cur);if(tab)topbar.appendChild(tab); /* 作業/チェック担当（表示のみ・設定は設定画面から） */
-  topbar.appendChild(el('div','spacer')); /* ステータス切替・設定・削除は画面右側へ */
+  topbar.appendChild(el('div','spacer')); /* ステータス切替・担当・設定・削除は画面右側へ */
   if(cur.versions.length)topbar.appendChild(buildStatusSelect(cur)); /* ステータス切替プルダウン */
+  /* 作業者・チェック者：設定UIから出して 設定ボタンの左に横並びで編集（検索付きプルダウン） */
+  if(projectMembers(rootOf(cur)).filter(m=>m.active!==false).length){
+    topbar.appendChild(taskAssignTopPicker(cur,'assignee','作業'));
+    topbar.appendChild(taskAssignTopPicker(cur,'reviewer','チェック'));
+  }
   const trn=el('button','btn btn-ghost btn-sm','設定');trn.onclick=()=>openRename(cur);topbar.appendChild(trn);
   const tdel=el('button','btn btn-danger btn-sm','削除');tdel.onclick=()=>deleteNode(cur);topbar.appendChild(tdel);
   s.appendChild(topbar);
@@ -2921,15 +2932,7 @@ function openRename(node){
       inner.appendChild(addStg);
     }
     /* タスク（工程）：作業担当・チェック担当（メンバーから選択。ショット単位ではなく工程ごとに設定） */
-    let asgPick=null,revPick=null;
-    if(node.type==='review'){
-      const aroot=rootOf(node);const members=projectMembers(aroot).filter(m=>m.active!==false);
-      inner.appendChild(el('div','divider'));
-      inner.appendChild(el('div','form-label','担当（この工程／タスクの作業担当者・チェック担当者。同じショットでも工程ごとに個別に設定できます）'));
-      asgPick=memberSearchPicker(aroot,node.assignee,'作業担当');inner.appendChild(asgPick.row);
-      revPick=memberSearchPicker(aroot,node.reviewer,'チェック担当');inner.appendChild(revPick.row);
-      if(!members.length)inner.appendChild(el('div','form-label','※ メンバーが未登録です。プロジェクト設定 → メンバー管理で登録してください。'));
-    }
+    /* 作業者/チェック者の設定はタスクページ上部バー（設定ボタンの左）に移設 */
     /* プロジェクト（ルート）ならステータス／進捗のショット親フォルダを編集できる */
     let stArr=null,spSel=null,projThumbFile=null,projThumbUrlTmp=null,projCropWidget=null;
     let pwNew=null,pwConf=null,pwRemove=null;
@@ -3022,8 +3025,6 @@ function openRename(node){
     }
     const cancel=el('button','btn btn-ghost','キャンセル');cancel.onclick=closeModal;
     const save=el('button','btn btn-primary','保存');save.onclick=async()=>{if(!nameRow.f.value.trim())return toast('名前を入力してください');node.name=nameRow.f.value.trim();node.description=descRow.f.value.trim();node.type=ts.get();if(stArr)node.statuses=stArr.filter(x=>x.label.trim()).map(x=>({id:x.id||newId('st'),label:x.label.trim(),color:x.color}));if(spSel){if(spSel.value)node.shotsParentId=spSel.value;else delete node.shotsParentId}if(stagesArr!=null){const s=stagesArr.map(x=>x.trim()).filter(Boolean);if(s.length&&ts.get()==='section')node.stages=s;else delete node.stages}
-      if(asgPick){const v=asgPick.get();if(v)node.assignee=v;else delete node.assignee}
-      if(revPick){const v=revPick.get();if(v)node.reviewer=v;else delete node.reviewer}
       /* プロジェクトのパスワード保護：新規入力があれば設定/変更、解除チェックで削除 */
       if(!node.parentId){
         if(pwRemove&&pwRemove.checked){delete node.passHash;delete node.passSalt;unlockedSet().delete(node.id)}
@@ -3095,6 +3096,13 @@ function memberSearchPicker(root,current,label,onChange,noneLabel){
   box.appendChild(input);box.appendChild(dd);row.appendChild(box);
   setDisplay();
   return {row,get:()=>value};
+}
+/* タスクページ上部バー用：作業者/チェック者を編集できる検索付きインラインピッカー */
+function taskAssignTopPicker(node,field,label){
+  const root=rootOf(node);
+  const p=memberSearchPicker(root,node[field],label,async v=>{if(v)node[field]=v;else delete node[field];await persist();renderBody();resolveThumbs()},'— 未割当');
+  p.row.classList.add('tt-asg',field==='assignee'?'tt-asg-a':'tt-asg-r');
+  return p.row;
 }
 /* 単一の工程が担当フィルタに一致するか */
 function reviewMatchesFilter(rv){
