@@ -519,6 +519,8 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .tl-stile .sn{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .subl{max-width:1000px}
 .fb-overlay{position:fixed;inset:0;background:#0a0a0c;z-index:1500;display:flex;flex-direction:column}
+.fb-backdrop{position:fixed;inset:0;background:rgba(6,6,10,.66);z-index:1490}
+.fb-overlay.fb-modal{inset:2.5vh 2.5vw;background:#0a0a0c;border:1px solid var(--border2);border-radius:12px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.7)}
 .fb-top{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .fb-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fb-body{flex:1;display:flex;min-height:0}
@@ -1392,7 +1394,7 @@ function hashOf(){
 }
 let _hashLock=false;
 function syncHash(){const h=hashOf();if(location.hash!==h){_hashLock=true;location.hash=h;setTimeout(()=>{_hashLock=false},0)}}
-function closeReviewOverlay(){const ov=$('#fbOverlay');if(ov)ov.remove();state.reviewOpen=null}
+function closeReviewOverlay(){const ov=$('#fbOverlay');if(ov)ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null}
 /* ハッシュを解釈して画面を復元。initial=起動時（該当なしなら false を返し localStorage 復元に委譲） */
 function applyHash(initial){
   const raw=(location.hash||'').replace(/^#\/?/,'');
@@ -1847,7 +1849,7 @@ function renderProjCheck(main,root){
     const lv=latestVideoVersionUnder(n.id);
     const it=el('div','tl-item');it.title='クリックでタスクページをタブ表示（動画タイルはアノテーション表示）';it.onclick=()=>go(n.id);
     const th=el('img','tl-thumb');if(lv&&lv.v.thumb)th.dataset.ref=lv.v.thumb;
-    if(lv){th.title='クリックでアノテーションウィンドウを開く';th.onclick=ev=>{ev.stopPropagation();openReview(lv.node.id,lv.v.id)}} /* 動画タイルはアノテーション表示 */
+    if(lv){th.title='クリックでアノテーションウィンドウを開く';th.onclick=ev=>{ev.stopPropagation();openReview(lv.node.id,lv.v.id,{modal:true})}} /* 動画タイルはアノテーションをモーダル表示 */
     it.appendChild(th);
     const bd=el('div','tl-body');
     bd.appendChild(el('div','tl-path',shotOf(n)||n.name)); /* ショット名 */
@@ -3182,11 +3184,14 @@ function genThumb(file){return new Promise(resolve=>{const isVideo=file.type.sta
    FB画面（シンクスケッチ風）
    アノテーション描画 / フレーム単位スクラブ / フレーム紐付きコメント
    ============================================================ */
-function openReview(nodeId,versionId){
+function openReview(nodeId,versionId,opts){
+  opts=opts||{};
   const node=getNode(nodeId);const v=node.versions.find(x=>x.id===versionId);
   const isVideo=v.type==='video';
   const old=$('#fbOverlay');if(old)old.remove();
-  const ov=el('div','fb-overlay');ov.id='fbOverlay';
+  const oldBd=$('#fbBackdrop');if(oldBd)oldBd.remove();
+  const ov=el('div','fb-overlay'+(opts.modal?' fb-modal':''));ov.id='fbOverlay';
+  if(opts.modal){const bd=el('div','fb-backdrop');bd.id='fbBackdrop';bd.onclick=()=>close();document.body.appendChild(bd)} /* モーダル表示：背景を暗転 */
   /* レビュー画面のURLを反映（作業者間でリンク共有可能に） */
   state.reviewOpen={nodeId,versionId};syncHash();
 
@@ -3196,7 +3201,7 @@ function openReview(nodeId,versionId){
   let drafts=[];
   const shownNotes=()=>v.review.notes.concat(drafts);
 
-  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;document.removeEventListener('keydown',onKey);ov.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
+  function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;document.removeEventListener('keydown',onKey);ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
 
   /* --- トップバー --- */
   const top=el('div','fb-top');
