@@ -529,7 +529,8 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .tl-subcount{color:var(--text3);font-size:12px;margin-left:8px}
 .tl-substages{display:flex;flex-wrap:wrap;gap:5px;margin:5px 0 2px}
 /* タイムラインのサブミット：1ショット=1タイルで横並び */
-.tl-submit-group{border:1px solid var(--border);border-left:3px solid var(--edge);border-radius:10px;background:var(--bg2);padding:12px 14px;margin-bottom:14px}
+.tl-submit-group{border:1px solid var(--border);border-left:3px solid var(--edge);border-radius:10px;background:var(--bg2);padding:12px 14px;margin-bottom:14px;transition:background .12s,border-color .12s,box-shadow .12s}
+.tl-submit-group:hover{background:var(--bg3);border-color:var(--border2);border-left-color:var(--edge);box-shadow:0 0 0 1px var(--edgeglow)}
 .tl-submit-head{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px}
 .tl-submit-head:hover .tl-subname{color:var(--accent2)}
 .tl-submit-head .tl-submeta{color:var(--text3);font-size:12px;margin-left:auto}
