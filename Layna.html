@@ -1835,7 +1835,7 @@ function renderProjCheck(main,root){
     bd.appendChild(el('div','tl-path',shotOf(n)||n.name)); /* ショット名 */
     const t=el('div','tl-title');
     const stg=el('span','tl-stage',n.name);stg.style.background=stageColor(n.name);t.appendChild(stg); /* 工程 */
-    const si=stInfo(n);const stB=el('span','tl-stage',si.label);stB.style.background=si.color;t.appendChild(stB); /* ステータス */
+    const sp=buildStatusSelect(n);sp.onclick=e=>e.stopPropagation();t.appendChild(sp); /* ステータス変更（行クリックの遷移を抑止） */
     bd.appendChild(t);
     const ab=taskAssignBadges(n);if(ab)bd.appendChild(ab); /* 作業/チェック担当 */
     bd.appendChild(el('div','tl-meta',lv?('最新: '+lv.v.name+'　by '+(lv.v.uploadedBy||'-')+'・'+fmt(lv.v.uploadedAt)):'動画なし'));
