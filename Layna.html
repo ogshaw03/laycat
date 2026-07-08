@@ -56,9 +56,9 @@ a{color:var(--accent);text-decoration:none;cursor:pointer}
 .btn-primary:hover{background:#fff}
 .btn-ghost{border:1px solid var(--border);color:var(--text2)}
 .btn-ghost:hover{border-color:var(--border2);color:var(--text)}
-/* 右側スライドの「ページで開く」を目立たせるアクセント（緑系・ステータスとは別トーン） */
-.btn-open{background:var(--green);color:#0d0d0f;border:1px solid var(--green);font-weight:700}
-.btn-open:hover{background:#9bd3b3;border-color:#9bd3b3}
+/* 右側スライドの「タブに追加」：ツールのモノクロに合わせた明色の主要ボタン */
+.btn-open{background:var(--accent2);color:#16161a;border:1px solid var(--accent2);font-weight:700}
+.btn-open:hover{background:#fff;border-color:#fff}
 .btn-danger{border:1px solid var(--red);color:var(--red)}
 .btn-danger:hover{background:rgba(255,90,90,.12)}
 .btn-sm{padding:4px 9px;font-size:12px}
@@ -2303,7 +2303,12 @@ function fillSubmitDrawer(){
   const toReel=el('button','btn btn-primary btn-sm','▶ まとめて REEL に送る');toReel.onclick=()=>subSendToReel(sb);back._acts.appendChild(toReel);
   const body=back._body;body.innerHTML='';curUploadUI=null;
   if(sb.comment){const bc=el('div','sub-viewcmt');bc.appendChild(elIco('div','ttl','folder','サブミットへのコメント'));bc.appendChild(el('div','tx',sb.comment));body.appendChild(bc);}
-  body.appendChild(el('div','section-label','提出物（タイルをクリックすると下にタスクページを表示）'));
+  /* 提出物ヘッダ：まとめて全カットをタブに追加するボタンを配置 */
+  const sl=el('div','section-label');sl.appendChild(el('span',null,'提出物（タイルをクリックすると下にタスクページを表示）'));
+  const slActs=el('div','acts');
+  const addAll=el('button','btn btn-open btn-sm','＋ まとめてタブに追加');addAll.title='この提出の全カットをタスクタブに追加';
+  addAll.onclick=()=>{const nodes=(sb.items||[]).map(it=>getNode(it.nodeId)).filter(n=>n&&n.type==='review');if(!nodes.length)return;for(const n of nodes){state.openTasks=(state.openTasks||[]).filter(x=>x!==n.id);state.openTasks.push(n.id)}closeReviewDrawer();go(nodes[nodes.length-1].id)};
+  slActs.appendChild(addAll);sl.appendChild(slActs);body.appendChild(sl);
   const grid=el('div','pm-grid');
   const detail=el('div','sub-detail');
   const tiles=[];
