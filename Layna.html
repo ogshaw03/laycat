@@ -523,6 +523,10 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .fb-overlay.fb-modal{inset:5.5vh 6.5vw;background:#0a0a0c;border:1px solid var(--border2);border-radius:12px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.7)}
 .fb-top{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .fb-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fb-fs{flex-shrink:0}
+.fb-top{padding-right:48px} /* 右上の閉じるボタン用に余白を確保 */
+.fb-close{position:absolute;top:8px;right:10px;z-index:6;font-size:14px;color:var(--text2);width:30px;height:30px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--bg2);cursor:pointer}
+.fb-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
 .fb-body{flex:1;display:flex;min-height:0}
 .fb-stage{flex:1;display:flex;flex-direction:column;min-width:0}
 .fb-media-wrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;overflow:hidden}
@@ -544,6 +548,8 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .lyr-head .nm{flex:1;font-family:var(--font-head);font-weight:700}
 .lyr-eye{font-size:11px;color:var(--text3);cursor:pointer;padding:1px 4px;border-radius:4px}
 .lyr-eye:hover{color:var(--text)}
+.lyr-del{font-size:11px;color:var(--text3);cursor:pointer;padding:1px 5px;border-radius:4px;line-height:1}
+.lyr-del:hover{color:#fff;background:var(--red)}
 .lyr-prev{display:block;width:100%;background:#101013}
 .lyr-add{margin:2px 0 10px;padding:7px;border:1px dashed var(--border2);border-radius:8px;color:var(--text3);font-size:12px;flex-shrink:0}
 .lyr-add:hover{color:var(--text);border-color:#e8e8ec}
@@ -3184,14 +3190,15 @@ function genThumb(file){return new Promise(resolve=>{const isVideo=file.type.sta
    FB画面（シンクスケッチ風）
    アノテーション描画 / フレーム単位スクラブ / フレーム紐付きコメント
    ============================================================ */
+let fbFullscreen=false; /* アノテーションウィンドウの表示モード：既定はモーダル。ユーザー操作で全画面に切替（セッション内で記憶） */
 function openReview(nodeId,versionId,opts){
   opts=opts||{};
   const node=getNode(nodeId);const v=node.versions.find(x=>x.id===versionId);
   const isVideo=v.type==='video';
   const old=$('#fbOverlay');if(old)old.remove();
   const oldBd=$('#fbBackdrop');if(oldBd)oldBd.remove();
-  const ov=el('div','fb-overlay'+(opts.modal?' fb-modal':''));ov.id='fbOverlay';
-  if(opts.modal){const bd=el('div','fb-backdrop');bd.id='fbBackdrop';bd.onclick=()=>close();document.body.appendChild(bd)} /* モーダル表示：背景を暗転 */
+  const ov=el('div','fb-overlay');ov.id='fbOverlay';
+  let fsBtn=null; /* モーダル⇄全画面トグルボタン */
   /* レビュー画面のURLを反映（作業者間でリンク共有可能に） */
   state.reviewOpen={nodeId,versionId};syncHash();
 
@@ -3202,10 +3209,12 @@ function openReview(nodeId,versionId,opts){
   const shownNotes=()=>v.review.notes.concat(drafts);
 
   function close(){const unsent=drafts.length||pending.length||(ta&&ta.value.trim());if(unsent&&!confirm('未送信の記入・アノテーションがあります。閉じると失われます。よろしいですか？'))return;document.removeEventListener('keydown',onKey);ov.remove();const bd=$('#fbBackdrop');if(bd)bd.remove();state.reviewOpen=null;syncHash();render();resolveThumbs()}
+  /* 表示モード（モーダル⇄全画面） */
+  function fbBackdropEnsure(){let bd=$('#fbBackdrop');if(!bd){bd=el('div','fb-backdrop');bd.id='fbBackdrop';bd.onclick=()=>close();if(ov.parentNode)ov.parentNode.insertBefore(bd,ov);else document.body.appendChild(bd)}return bd}
+  function fbApplyMode(){if(fbFullscreen){ov.classList.remove('fb-modal');const bd=$('#fbBackdrop');if(bd)bd.remove()}else{ov.classList.add('fb-modal');fbBackdropEnsure()}if(fsBtn){fsBtn.textContent=fbFullscreen?'❐':'⛶';fsBtn.title=fbFullscreen?'モーダル表示に戻す':'全画面表示'}}
 
   /* --- トップバー --- */
   const top=el('div','fb-top');
-  const back=el('button','btn btn-ghost btn-sm','← 戻る');back.onclick=close;top.appendChild(back);
   const tt=el('div','fb-title',node.name+' — '+v.name);top.appendChild(tt);
   const stEl=el('span');function updSt(){const st=stInfo(node);stEl.className='badge';stEl.textContent=st.label;stEl.style.background=hexA(st.color,.18);stEl.style.color=st.color}updSt();
   top.appendChild(stEl);
@@ -3222,8 +3231,11 @@ function openReview(nodeId,versionId,opts){
   const delBtn=el('button','btn btn-danger btn-sm');delBtn.appendChild(icoEl('trash'));delBtn.title='このバージョンを削除';
   delBtn.onclick=async()=>{if(!confirm(v.name+' を削除しますか？'))return;await storage.delMedia(v.file);await storage.delMedia(v.thumb);node.versions=node.versions.filter(x=>x.id!==v.id);node.thumbnail=node.versions.length?node.versions[node.versions.length-1].thumb:null;await persist();close()};
   top.appendChild(delBtn);
-  const x=el('button','modal-close','×');x.onclick=close;top.appendChild(x);
+  /* 表示モード切替 */
+  fsBtn=el('button','btn btn-ghost btn-sm fb-fs','⛶');fsBtn.onclick=()=>{fbFullscreen=!fbFullscreen;fbApplyMode()};top.appendChild(fsBtn);
   ov.appendChild(top);
+  /* 閉じる：常に右上コーナー固定（PCのウィンドウと同じ位置。トップバーが折り返しても動かない） */
+  const x=el('button','fb-close','✕');x.title='閉じる';x.onclick=close;ov.appendChild(x);
 
   /* --- ステージ（メディア + 描画キャンバス） --- */
   const body=el('div','fb-body');
@@ -3340,6 +3352,7 @@ function openReview(nodeId,versionId,opts){
   body.appendChild(side);
   ov.appendChild(body);
   document.body.appendChild(ov);
+  fbApplyMode(); /* 既定はモーダル（fbFullscreen=false）。全画面はユーザー操作で */
 
   /* --- フレーム制御（リアルタイムスクラブ対応） --- */
   const curFrame=()=>isVideo?Math.min(totalFrames-1,Math.max(0,Math.round(media.currentTime*FPS))):null;
@@ -3478,12 +3491,27 @@ function openReview(nodeId,versionId,opts){
       h.appendChild(el('span','nm','L'+i));
       const eye=el('span','lyr-eye','👁');eye.title='このレイヤーの表示/非表示';
       eye.onclick=ev=>{ev.stopPropagation();layerVis[i-1]=!layerVis[i-1];drawAll()};
-      h.appendChild(eye);card.appendChild(h);
+      h.appendChild(eye);
+      const del=el('span','lyr-del','✕');del.title='このレイヤーを削除';del.onclick=ev=>{ev.stopPropagation();deleteLayer(i)};h.appendChild(del);
+      card.appendChild(h);
       const cv=el('canvas','lyr-prev');cv.width=134;cv.height=75;card.appendChild(cv);
       card.onclick=()=>{activeLayer=i;drawAll()};
       lyrList.appendChild(card);lyrCards.push({card,cv,eye,i});
     }
     updateLayerPanel();
+  }
+  /* レイヤー削除：未送信の描画（pending / 記入中ストローク / 下書き）から当該レイヤーを除去し、上位レイヤーを繰り下げ */
+  function deleteLayer(i){
+    if(!confirm('レイヤー L'+i+' を削除しますか？（このレイヤーの未送信の描画が削除されます）'))return;
+    const shift=arr=>{for(const s of arr){const L=s.layer||1;if(L>i)s.layer=L-1}};
+    pending=pending.filter(p=>(p.layer||1)!==i);shift(pending);
+    if(stroke){const L=stroke.layer||1;if(L===i)stroke=null;else if(L>i)stroke.layer=L-1}
+    for(const dn of drafts){if(dn.drawing&&dn.drawing.length){dn.drawing=dn.drawing.filter(s=>(s.layer||1)!==i);shift(dn.drawing)}}
+    drafts=drafts.filter(dn=>(dn.text&&String(dn.text).trim())||(dn.drawing&&dn.drawing.length));
+    layerVis.splice(i-1,1);layerVis.push(true);
+    if(layerCount>1)layerCount--;
+    if(activeLayer>layerCount)activeLayer=layerCount;if(activeLayer<1)activeLayer=1;
+    buildLayerPanel();drawAll();drawTimeline();updSubmit();
   }
   function updateLayerPanel(){
     const f=dispFrame?dispFrame():null;
