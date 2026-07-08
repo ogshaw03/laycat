@@ -1868,8 +1868,7 @@ function renderProjCheck(main,root){
   const pendCnt=hits.filter(isPend).length;const doneCnt=hits.length-pendCnt;
   main.appendChild(el('div','pm-h',(selNone?'未割り当て':(meSel?(meSel.name||meSel.id):state.checkReviewer))+' のチェック待ち（未チェック '+pendCnt+' カット'+(doneCnt?'・チェック済 '+doneCnt+' カット':'')+'）'));
   if(!hits.length){main.appendChild(el('div','pm-empty','このバケットのチェック待ちカットはありません。'));return}
-  /* 未チェックを上に、チェック済みを下にまとめる */
-  hits.sort((a,b)=>(isPend(a)?0:1)-(isPend(b)?0:1));
+  /* 並び順はショット名で固定（ステータス変更で位置が動かない＝並べ替えを防ぐ）。済みはその場で薄く表示 */
   /* タイムライン風の横長・縦並び：左に動画タイル、右にショットの各種情報 */
   const list=el('div','tl');
   for(const n of hits){
