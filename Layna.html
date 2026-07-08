@@ -2585,7 +2585,6 @@ function logItem(node,v){
     const lb=elIco('button','btn btn-ghost btn-sm','reel',' '+r.name);lb.title='保存済みリールを開く';
     lb.onclick=()=>openReelFromSaved(r.id);head.appendChild(lb);
   }
-  const detail=el('button','btn btn-ghost btn-sm','チェック / 詳細');detail.onclick=()=>openReview(node.id,v.id);head.appendChild(detail);
   it.appendChild(head);
   // 動画左・フレームコメント右のレイアウト（ショット全体へのコメントは廃止＝メッセージ機能を使用）
   const flexw=el('div','log-flex');
