@@ -557,20 +557,16 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .fb-backdrop{position:fixed;inset:0;background:rgba(6,6,10,.66);z-index:1490}
 .fb-overlay.fb-modal{inset:5.5vh 6.5vw;background:#0a0a0c;border:1px solid var(--border2);border-radius:12px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.7)}
 /* 比較再生（A/B） */
-.cmp-overlay{position:fixed;inset:4vh 4vw;z-index:1600;background:#0a0a0c;border:1px solid var(--border2);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden}
-.cmp-top{display:flex;align-items:center;gap:12px;padding:10px 48px 10px 16px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
-.cmp-top .cmp-title{font-family:var(--font-head);font-weight:700;font-size:15px}
-.cmp-top .spacer{flex:1}
-.cmp-wrap{flex:1;min-height:0;display:flex;gap:2px;background:#000}
-.cmp-pane{flex:1;min-width:0;display:flex;flex-direction:column;background:#000}
-.cmp-lab{font-size:12px;padding:6px 10px;color:var(--text);background:var(--bg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--border)}
-.cmp-lab.a{border-left:3px solid var(--edge)}
-.cmp-lab.b{border-left:3px solid var(--green)}
-.cmp-video{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}
-.cmp-video video{max-width:100%;max-height:100%;object-fit:contain}
-.cmp-ctr{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0}
-.cmp-slider{flex:1;accent-color:var(--accent2)}
-.cmp-time{font-variant-numeric:tabular-nums;color:var(--text2);font-size:12px;white-space:nowrap}
+/* 比較（A/B）：アノテーションウィンドウ内の横並び表示 */
+.fb-media-row{flex:1;min-height:0;display:flex;gap:0}
+.fb-media-row>*{min-width:0}
+.fb-pane-b{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;border-left:2px solid var(--edge)}
+.fb-pane-b video{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.fb-pane-lab{position:absolute;top:6px;left:8px;z-index:6;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(10,10,12,.72);color:var(--text);pointer-events:none;white-space:nowrap;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis}
+.fb-pane-lab.a{border-left:3px solid var(--edge)}
+.fb-pane-lab.b{border-left:3px solid var(--green)}
+.fb-pane-x{position:absolute;top:6px;right:8px;z-index:7;font-size:11px;padding:3px 9px;border-radius:5px;border:1px solid var(--border2);background:rgba(10,10,12,.8);color:var(--text2);cursor:pointer}
+.fb-pane-x:hover{color:var(--text);border-color:var(--text3)}
 /* 比較相手の選択（タイル＋検索） */
 .cmp-search{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);padding:6px 10px;font-size:13px;width:240px;font-family:inherit}
 .cmp-search:focus{outline:none;border-color:var(--border2)}
@@ -3376,6 +3372,8 @@ function openReview(nodeId,versionId,opts){
 
   let FPS=v.fps||24,totalFrames=1,lastFrame=-1;
   let tool=null,erasing=false,pending=[],stroke=null,brushW=4,eraseW=16;
+  /* 比較再生（A/B）：B は同じウィンドウ内で横並び表示・A に同期。アノテーションは A（開いている版）に描く */
+  let cmpOn=false,bVid=null,paneB=null,cmpBtn=null;
   /* 記入（下書き）：記入ボタンで積む。送信ボタンを押すまでレビューページ(v.review.notes)には反映しない */
   let drafts=[];
   const shownNotes=()=>v.review.notes.concat(drafts);
@@ -3399,6 +3397,7 @@ function openReview(nodeId,versionId,opts){
     b.onclick=async()=>{node.status=stt.id;await persist();updSt()};
     top.appendChild(b);
   }
+  if(isVideo){cmpBtn=el('button','btn btn-ghost btn-sm','⇄ 比較');cmpBtn.title='別の版・カットと横並びで比較（アノテーション可）';cmpBtn.onclick=()=>{if(cmpOn)exitCompare();else openComparePicker(node,v,(bN,bV)=>enterCompare(bN,bV))};top.appendChild(cmpBtn)}
   if(isVideo){const rb=elIco('button','btn btn-ghost btn-sm','reel',' REELに送る');rb.title='この動画を REEL に送る';rb.onclick=()=>sendToReel(node,v);top.appendChild(rb)}
   const delBtn=el('button','btn btn-danger btn-sm');delBtn.appendChild(icoEl('trash'));delBtn.title='このバージョンを削除';
   delBtn.onclick=async()=>{if(!confirm(v.name+' を削除しますか？'))return;await storage.delMedia(v.file);await storage.delMedia(v.thumb);node.versions=node.versions.filter(x=>x.id!==v.id);node.thumbnail=node.versions.length?node.versions[node.versions.length-1].thumb:null;await persist();close()};
@@ -3421,7 +3420,8 @@ function openReview(nodeId,versionId,opts){
   zoomEl.appendChild(media);
   const trace=el('div','fb-trace');zoomEl.appendChild(trace); // トラッキングペーパー（白レイヤー）
   const canvas=el('canvas','fb-canvas');canvas.style.pointerEvents='none';zoomEl.appendChild(canvas);
-  stage.appendChild(wrap);
+  /* メディア行：A（既存のwrap）＋ 比較時に B ペインを右に追加 */
+  const mediaRow=el('div','fb-media-row');mediaRow.appendChild(wrap);stage.appendChild(mediaRow);
 
   /* --- タイムライン（フレーム目盛り・シンクスケッチ風） --- */
   const tlWrap=el('div','fb-tl-wrap');
@@ -3468,7 +3468,7 @@ function openReview(nodeId,versionId,opts){
   tbTop.appendChild(drawBtn);tbTop.appendChild(brushSel);tbTop.appendChild(eraserBtn);tbTop.appendChild(eraseSel);tbTop.appendChild(clrRow);tbTop.appendChild(colorIn);
   if(isVideo){tbTop.appendChild(durSel);tbTop.appendChild(ghostBtn)}
   tbTop.appendChild(eyeBtn);tbTop.appendChild(traceBtn);tbTop.appendChild(layBtn);tbTop.appendChild(undoBtn);tbTop.appendChild(clearBtn);
-  stage.insertBefore(tbTop,wrap);
+  stage.insertBefore(tbTop,mediaRow);
   /* 再生・ズーム系は下側 */
   if(isVideo){ctr.appendChild(playBtn);ctr.appendChild(prevBtn);ctr.appendChild(nextBtn);ctr.appendChild(loopBtn);ctr.appendChild(frameLab);ctr.appendChild(fpsSel)}
   ctr.appendChild(ziBtn);ctr.appendChild(zoBtn);ctr.appendChild(zoomLab);ctr.appendChild(zrBtn);ctr.appendChild(handBtn);
@@ -3560,8 +3560,9 @@ function openReview(nodeId,versionId,opts){
     media.addEventListener('seeked',()=>{clearTimeout(seekGuard);seekBusy=false;if(seekPend>=0){const p=seekPend;seekPend=-1;seekRT(p)}else snapToFrame()});
     playBtn.onclick=()=>{if(media.paused)media.play();else media.pause()};
     loopBtn.onclick=()=>{media.loop=!media.loop;loopBtn.classList.toggle('active',media.loop)};
-    media.addEventListener('play',()=>{playBtn.textContent='⏸'});
-    media.addEventListener('pause',()=>{playBtn.textContent='▶';snapToFrame()});
+    media.addEventListener('play',()=>{playBtn.textContent='⏸';if(cmpOn&&bVid)bVid.play().catch(()=>{})});
+    media.addEventListener('pause',()=>{playBtn.textContent='▶';if(cmpOn&&bVid){try{bVid.pause()}catch(_){}syncBToA(true)}snapToFrame()});
+    media.addEventListener('timeupdate',()=>{if(cmpOn)syncBToA()});
     prevBtn.onclick=()=>seekFrame(dispFrame()-1);
     nextBtn.onclick=()=>seekFrame(dispFrame()+1);
     fpsSel.onchange=async()=>{FPS=parseInt(fpsSel.value);v.fps=FPS;await persist();setupDuration();sync(true)};
@@ -3617,7 +3618,40 @@ function openReview(nodeId,versionId,opts){
     ctx.fillStyle='#e8e8ec';ctx.fillRect(bx,H-13,tw,13);
     ctx.fillStyle='#16161a';ctx.fillText(lab,bx+4,H-3);
   }
-  function refreshView(){fmtFrame();drawAll();drawTimeline()}
+  function refreshView(){fmtFrame();drawAll();drawTimeline();if(cmpOn)syncBToA()}
+  /* B を A に同期：停止・シーク中は厳密に、再生中はドリフト補正のみ */
+  function syncBToA(hard){
+    if(!cmpOn||!bVid)return;
+    const t=Math.min(media.currentTime,(bVid.duration||media.currentTime));
+    if(hard||media.paused){if(Math.abs((bVid.currentTime||0)-t)>0.008){try{bVid.currentTime=t}catch(_){}}}
+    else if(Math.abs((bVid.currentTime||0)-media.currentTime)>0.15){try{bVid.currentTime=t}catch(_){}}
+  }
+  /* 比較モードに入る：B ペインを右に追加し動画を読み込む（A の transport に追従） */
+  function enterCompare(bNode,bVer){
+    const bn=getNode(bNode.id)||bNode;const bv=bn.versions.find(x=>x.id===bVer.id)||bVer;
+    if(!bv||bv.type!=='video'){toast('比較できるのは動画のみです');return}
+    const blab='B  '+((shotOf(bn)?shotOf(bn)+' / ':'')+bn.name+'  '+bv.name);
+    if(!paneB){
+      paneB=el('div','fb-pane-b');
+      const lab=el('div','fb-pane-lab b');lab.textContent=blab;paneB.appendChild(lab);
+      bVid=el('video');bVid.muted=true;bVid.playsInline=true;bVid.preload='auto';paneB.appendChild(bVid);
+      const bx=el('button','fb-pane-x','✕ 比較終了');bx.title='比較表示を終了';bx.onclick=exitCompare;paneB.appendChild(bx);
+      mediaRow.appendChild(paneB);
+      /* A ペインにもラベル（比較中のみ表示） */
+      if(!wrap.querySelector('.fb-pane-lab')){const la=el('div','fb-pane-lab a');la.textContent='A  '+node.name+'  '+v.name;wrap.appendChild(la)}
+    }else{const lab=paneB.querySelector('.fb-pane-lab');if(lab)lab.textContent=blab}
+    cmpOn=true;if(cmpBtn){cmpBtn.classList.add('active');cmpBtn.textContent='⇄ 比較中'}
+    storage.getURL(bv.file).then(u=>{if(u&&bVid){bVid.src=u;bVid.addEventListener('loadedmetadata',()=>syncBToA(true),{once:true})}});
+    fit();
+  }
+  function exitCompare(){
+    if(!cmpOn)return;cmpOn=false;
+    if(bVid){try{bVid.pause()}catch(_){}}
+    if(paneB){paneB.remove();paneB=null}bVid=null;
+    const la=wrap.querySelector('.fb-pane-lab');if(la)la.remove();
+    if(cmpBtn){cmpBtn.classList.remove('active');cmpBtn.textContent='⇄ 比較'}
+    fit();
+  }
 
   /* --- キャンバス（メディア表示域にフィット） --- */
   function fit(){
@@ -3866,6 +3900,8 @@ function openReview(nodeId,versionId,opts){
 
   /* --- メディア読み込み --- */
   (async()=>{const url=await storage.getURL(v.file);if(url)media.src=url;setTimeout(fit,60)})();
+  /* 版カードの「⇄ 比較」等から比較対象を指定して開いた場合 */
+  if(opts.compare){const bn=getNode(opts.compare.nodeId);const bv=bn&&bn.versions.find(x=>x.id===opts.compare.verId);if(bn&&bv)enterCompare(bn,bv)}
 }
 
 /* ============================================================
@@ -5126,7 +5162,8 @@ async function reelAddClip(node,v,noDedup){
    比較再生（A/B）— 2つの動画を横並びで同期再生（MVP）
    ============================================================ */
 /* 比較相手の選択：REEL読み込みと同様のタイル表示＋検索。既定で現在の工程を展開しておく */
-function openComparePicker(aNode,aVer){
+function openComparePicker(aNode,aVer,onPick){
+  onPick=onPick||((bN,bV)=>openReview(aNode.id,aVer.id,{compare:{nodeId:bN.id,verId:bV.id}}));
   const root=rootOf(aNode);
   const revs=descendants(root.id).filter(n=>n.type==='review'&&n.versions.some(x=>x.type==='video'));
   const modal=el('div','subpick');const pk=el('div','pk');
@@ -5155,7 +5192,7 @@ function openComparePicker(aNode,aVer){
       const vr=el('div','vr');vr.appendChild(el('span','vnm',it.ver.name));
       if(it.self)vr.appendChild(el('span','vcur','比較元'));else if(it.cur)vr.appendChild(el('span','vcur cur','現在の工程'));
       info.appendChild(vr);tile.appendChild(info);
-      if(!it.self)tile.onclick=()=>{modal.remove();openCompare({node:aNode,ver:aVer},{node:it.node,ver:it.ver})};
+      if(!it.self)tile.onclick=()=>{modal.remove();onPick(it.node,it.ver)};
       list.appendChild(tile);
     }
     if(!shown)list.appendChild(el('div','sub-empty','動画のあるタスクがありません。'));
@@ -5166,42 +5203,6 @@ function openComparePicker(aNode,aVer){
   pk.appendChild(pkh);pk.appendChild(pkb);pk.appendChild(pkf);modal.appendChild(pk);
   modal.onclick=e=>{if(e.target===modal)modal.remove()};document.body.appendChild(modal);
   setTimeout(()=>{try{search.focus()}catch(_){}},0);
-}
-/* 比較再生ウィンドウ（横並び・同期スクラブ） */
-function openCompare(a,b){
-  const old=$('#cmpOverlay');if(old)old.remove();const oldb=$('#cmpBackdrop');if(oldb)oldb.remove();
-  const nameOf=x=>((shotOf(x.node)?shotOf(x.node)+' / ':'')+x.node.name+'  '+x.ver.name);
-  const ov=el('div','cmp-overlay');ov.id='cmpOverlay';
-  const top=el('div','cmp-top');top.appendChild(el('div','cmp-title','⇄ 比較再生'));top.appendChild(el('div','spacer'));ov.appendChild(top);
-  const wrap=el('div','cmp-wrap');
-  const makePane=(label,x2,cls)=>{const pane=el('div','cmp-pane');const lab=el('div','cmp-lab '+cls);lab.textContent=label+'  '+nameOf(x2);pane.appendChild(lab);const holder=el('div','cmp-video');const vid=el('video');vid.muted=true;vid.playsInline=true;vid.preload='auto';holder.appendChild(vid);pane.appendChild(holder);return {pane,vid}};
-  const A=makePane('A（比較元）',a,'a');const B=makePane('B',b,'b');
-  wrap.appendChild(A.pane);wrap.appendChild(B.pane);ov.appendChild(wrap);
-  const ctr=el('div','cmp-ctr');
-  const play=el('button','btn btn-primary btn-sm','▶ 再生');
-  const pF=el('button','btn btn-ghost btn-sm','−1F');const nF=el('button','btn btn-ghost btn-sm','+1F');
-  const slider=el('input','cmp-slider');slider.type='range';slider.min='0';slider.max='1000';slider.value='0';
-  const tlab=el('span','cmp-time','0:00 / 0:00');
-  let loop=false;const loopB=el('button','btn btn-ghost btn-sm','ループ');loopB.onclick=()=>{loop=!loop;loopB.classList.toggle('active',loop)};
-  ctr.appendChild(play);ctr.appendChild(pF);ctr.appendChild(nF);ctr.appendChild(slider);ctr.appendChild(tlab);ctr.appendChild(loopB);ov.appendChild(ctr);
-  const bd=el('div','fb-backdrop');bd.id='cmpBackdrop';bd.onclick=()=>close();document.body.appendChild(bd);
-  document.body.appendChild(ov);
-  const x=el('button','fb-close','✕');x.title='閉じる';x.onclick=()=>close();ov.appendChild(x);
-  const fps=(a.ver.fps||b.ver.fps||24);
-  const dur=()=>Math.max(A.vid.duration||0,B.vid.duration||0)||1;
-  const fmtT=s=>{s=Math.max(0,s||0);return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0')};
-  const updTime=()=>{const d=dur();slider.value=String(Math.round((A.vid.currentTime/d)*1000));tlab.textContent=fmtT(A.vid.currentTime)+' / '+fmtT(d)};
-  const seekBoth=t=>{try{A.vid.currentTime=t}catch(_){}try{B.vid.currentTime=Math.min(t,(B.vid.duration||t))}catch(_){}};
-  A.vid.addEventListener('timeupdate',()=>{if(Math.abs((B.vid.currentTime||0)-A.vid.currentTime)>0.06){try{B.vid.currentTime=Math.min(A.vid.currentTime,B.vid.duration||A.vid.currentTime)}catch(_){}}updTime()});
-  A.vid.addEventListener('ended',()=>{if(loop){seekBoth(0);A.vid.play();B.vid.play()}else play.textContent='▶ 再生'});
-  play.onclick=()=>{if(A.vid.paused){A.vid.play();B.vid.play();play.textContent='⏸ 停止'}else{A.vid.pause();B.vid.pause();play.textContent='▶ 再生'}};
-  slider.oninput=()=>{const d=dur();const t=(parseInt(slider.value)/1000)*d;seekBoth(t);tlab.textContent=fmtT(t)+' / '+fmtT(d)};
-  const step=df=>{A.vid.pause();B.vid.pause();play.textContent='▶ 再生';const t=Math.max(0,A.vid.currentTime+df/fps);seekBoth(t);updTime()};
-  pF.onclick=()=>step(-1);nF.onclick=()=>step(1);
-  function close(){try{A.vid.pause();B.vid.pause()}catch(_){}ov.remove();const b2=$('#cmpBackdrop');if(b2)b2.remove();document.removeEventListener('keydown',onKey)}
-  function onKey(e){const tg=e.target&&e.target.tagName;if(tg==='INPUT'||tg==='TEXTAREA')return;if(e.key==='Escape'){close()}else if(e.key===' '){e.preventDefault();play.onclick()}else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}else if(e.key==='ArrowRight'){e.preventDefault();step(1)}}
-  document.addEventListener('keydown',onKey);
-  Promise.all([storage.getURL(a.ver.file),storage.getURL(b.ver.file)]).then(([ua,ub])=>{if(ua)A.vid.src=ua;if(ub)B.vid.src=ub;setTimeout(updTime,300)});
 }
 async function sendToReel(node,v){
   if(v.type!=='video'){toast('REEL に送れるのは動画のみです');return}
