@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.5';
+const APP_VERSION='2026.07.09.6';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2581,9 +2581,8 @@ function paintHead(ctx,W,H,s,alpha){
   }
   const proj=p=>{const r=rotv(p[0],p[1],p[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
-  /* 頭部シルエット（縦やや長の卵型・ロール反映） */
-  ctx.save();ctx.translate(cx,cy);ctx.rotate(roll);ctx.beginPath();ctx.ellipse(0,0,R*0.9,R*1.1,0,0,2*Math.PI);ctx.restore();
-  ctx.strokeStyle='rgba(255,255,255,.22)';ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1,R*0.02);ctx.stroke();
+  /* 球の外周シルエット */
+  ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1,R*0.02);ctx.stroke();
   /* 点列を投影して前面セグメントのみ描画（奥側は非表示） */
   function poly(pts,wf){
     let prev=null,pf=false;
@@ -2593,13 +2592,16 @@ function paintHead(ctx,W,H,s,alpha){
     }
     ctx.globalAlpha=alpha;
   }
-  /* 顔プロファイル（正中面の横顔輪郭：頭頂→額→鼻→口元→顎→首→後頭部）。鼻・顎の出っ張りを含む＝正中線かつ横顔シルエット */
-  const PROFILE=[[0,1.0,0.02],[0,0.78,0.5],[0,0.55,0.8],[0,0.28,0.9],[0,0.08,0.94],[0,-0.06,1.26],[0,-0.2,0.98],[0,-0.34,1.0],[0,-0.5,0.96],[0,-0.74,0.82],[0,-0.98,0.3],[0,-0.88,-0.35],[0,-0.45,-0.82],[0,0.05,-1.0],[0,0.55,-0.78],[0,1.0,0.02]];
-  poly(PROFILE,0.05);
-  /* アイライン（横の大円）＝左右の向き・傾きの基準 */
-  {const eye=[];for(let i=0;i<=48;i++){const t=i/48*2*Math.PI;eye.push([Math.sin(t),0,Math.cos(t)]);}poly(eye,0.03);}
-  /* 顎ライン（下部の横断輪郭）で顎のシルエットを補強 */
-  {const y=-0.6,rr=Math.sqrt(Math.max(0,1-y*y)),jl=[];for(let i=0;i<=48;i++){const t=i/48*2*Math.PI;jl.push([rr*Math.sin(t),y,rr*Math.cos(t)]);}poly(jl,0.028);}
+  const ring=fn=>{const a=[];for(let i=0;i<=56;i++){const t=i/56*2*Math.PI;a.push(fn(t));}return a;};
+  const seg=(a,b,wf)=>{const pa=proj(a),pb=proj(b);if(pa[2]>=-0.03&&pb[2]>=-0.03){ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();}};
+  poly(ring(t=>[0,Math.sin(t),Math.cos(t)]),0.045);  /* 正中線（縦） */
+  poly(ring(t=>[Math.sin(t),0,Math.cos(t)]),0.03);   /* アイライン（横） */
+  /* 鼻先の「角」：正面(+Z)へ突き出した頂点に稜線を集める */
+  const N=[0,-0.05,1.34];
+  seg(N,[0,0.36,0.93],0.045);    /* 鼻筋（上へ） */
+  seg(N,[-0.52,-0.1,0.85],0.04); /* 左の稜 */
+  seg(N,[0.52,-0.1,0.85],0.04);  /* 右の稜 */
+  seg(N,[0,-0.55,0.84],0.038);   /* 下（人中〜顎方向） */
   /* 中心（移動ハンドル） */
   ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.04),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.85;ctx.fill();
   ctx.restore();
