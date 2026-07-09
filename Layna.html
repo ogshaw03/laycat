@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.14';
+const APP_VERSION='2026.07.09.15';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -3555,7 +3555,7 @@ function openReview(nodeId,versionId,opts){
   const zrBtn=el('button','btn btn-ghost btn-sm','等倍');zrBtn.title='ズームリセット';
   const handBtn=el('button','btn btn-ghost btn-sm tool','✋ トラック');handBtn.title='ドラッグで表示位置を移動（中ボタンドラッグでも可）';
   const eraserBtn=el('button','btn btn-ghost btn-sm tool','◌ 消しゴム');eraserBtn.title='ブラシのようになぞって消す（選択中レイヤーのみ・未送信の線）';
-  const headBtn=el('button','btn btn-ghost btn-sm tool','◑ 顔の向き');headBtn.title='顔の向きガイド（正中線）を3D的に配置。ドラッグ=回転／Shift+ドラッグ=傾き（ロール）／Alt+ドラッグ=大きさ／中心付近ドラッグ=移動。消しゴムで削除。';
+  const headBtn=el('button','btn btn-ghost btn-sm tool','◑ 顔の向き');headBtn.title='顔の向きガイド（正中線）を3D的に配置。ドラッグ=回転／外周(白い円)をドラッグ=傾き（ロール）／Alt+ドラッグ=大きさ／中心をドラッグ=移動。消しゴムで削除。';
   const brushSel=el('select');[2,4,6,10,16,24].forEach(n=>brushSel.appendChild(new Option('ブラシ '+n,n)));brushSel.value='4';brushSel.title='ブラシサイズ(px)';
   const eraseSel=el('select');[8,16,28,44,64].forEach(n=>eraseSel.appendChild(new Option('消し '+n,n)));eraseSel.value='16';eraseSel.title='消しゴムサイズ(px)';
   const undoBtn=el('button','btn btn-ghost btn-sm','↩');undoBtn.title='元に戻す（Ctrl+Z）';
@@ -3919,17 +3919,21 @@ function openReview(nodeId,versionId,opts){
     let s;
     if(hit)s=hit;
     else{s={kind:'head',cx:x,cy:y,r:0.12,yaw:0,pitch:0,roll:0,color:colorIn.value,f:isVideo?f:null,layer:activeLayer};pending.push(s);redoStack=[]}
+    const d=Math.hypot(s.cx-x,(s.cy-y)*aspect);
     let mode='rotate';
     if(e.shiftKey)mode='roll';else if(e.altKey)mode='size';
-    else if(hit&&Math.hypot(hit.cx-x,(hit.cy-y)*aspect)<(hit.r||0.12)*0.4)mode='move';
-    headDrag={s,mode,sx:e.clientX,sy:e.clientY,yaw0:s.yaw,pitch0:s.pitch,roll0:s.roll,r0:s.r,cx0:s.cx,cy0:s.cy};
+    else if(d<(s.r||0.12)*0.33)mode='move';
+    else if(hit&&d>(s.r||0.12)*0.72)mode='roll'; /* 外周（白い円）付近を掴んだら傾き(ロール) */
+    const rc=canvas.getBoundingClientRect();const scx=rc.left+s.cx*rc.width,scy=rc.top+s.cy*rc.height;
+    const ang0=Math.atan2(e.clientY-scy,e.clientX-scx); /* ロール用：中心まわりの開始角度 */
+    headDrag={s,mode,sx:e.clientX,sy:e.clientY,yaw0:s.yaw,pitch0:s.pitch,roll0:s.roll,r0:s.r,cx0:s.cx,cy0:s.cy,ang0};
     headActive=s;drawAll();drawTimeline();updSubmit();
   }
   function headPointerMove(e){
     if(!headDrag)return;const r=canvas.getBoundingClientRect();
     const ndx=(e.clientX-headDrag.sx)/r.width,ndy=(e.clientY-headDrag.sy)/r.height;const s=headDrag.s;
     if(headDrag.mode==='rotate'){s.yaw=headDrag.yaw0+ndx*Math.PI*2;s.pitch=headDrag.pitch0+ndy*Math.PI*2;}
-    else if(headDrag.mode==='roll'){s.roll=headDrag.roll0+ndx*Math.PI*2;}
+    else if(headDrag.mode==='roll'){const scx=r.left+s.cx*r.width,scy=r.top+s.cy*r.height;const ang1=Math.atan2(e.clientY-scy,e.clientX-scx);s.roll=headDrag.roll0+(ang1-headDrag.ang0);} /* 外周を掴んで回した角度分だけ傾ける */
     else if(headDrag.mode==='size'){s.r=Math.max(0.03,Math.min(0.6,headDrag.r0+ndx));}
     else if(headDrag.mode==='move'){s.cx=headDrag.cx0+ndx;s.cy=headDrag.cy0+ndy;}
     drawAll();
