@@ -3373,7 +3373,7 @@ function openReview(nodeId,versionId,opts){
   let FPS=v.fps||24,totalFrames=1,lastFrame=-1;
   let tool=null,erasing=false,pending=[],stroke=null,brushW=4,eraseW=16;
   /* 比較再生（A/B）：B は同じウィンドウ内で横並び表示・A に同期。アノテーションは A（開いている版）に描く */
-  let cmpOn=false,bVid=null,paneB=null,cmpBtn=null;
+  let cmpOn=false,bVid=null,paneB=null,cmpBtn=null,bSeekBusy=false;
   /* 記入（下書き）：記入ボタンで積む。送信ボタンを押すまでレビューページ(v.review.notes)には反映しない */
   let drafts=[];
   const shownNotes=()=>v.review.notes.concat(drafts);
@@ -3560,9 +3560,8 @@ function openReview(nodeId,versionId,opts){
     media.addEventListener('seeked',()=>{clearTimeout(seekGuard);seekBusy=false;if(seekPend>=0){const p=seekPend;seekPend=-1;seekRT(p)}else snapToFrame()});
     playBtn.onclick=()=>{if(media.paused)media.play();else media.pause()};
     loopBtn.onclick=()=>{media.loop=!media.loop;loopBtn.classList.toggle('active',media.loop)};
-    media.addEventListener('play',()=>{playBtn.textContent='⏸';if(cmpOn&&bVid){syncBToA(true);bVid.play().catch(()=>{})}});
-    media.addEventListener('pause',()=>{playBtn.textContent='▶';if(cmpOn&&bVid){try{bVid.pause()}catch(_){}bVid.playbackRate=1;syncBToA(true)}snapToFrame()});
-    media.addEventListener('ratechange',()=>{if(cmpOn&&bVid&&media.paused)bVid.playbackRate=media.playbackRate||1});
+    media.addEventListener('play',()=>{playBtn.textContent='⏸';if(cmpOn&&bVid){try{bVid.pause()}catch(_){}syncBToA(true)}});
+    media.addEventListener('pause',()=>{playBtn.textContent='▶';if(cmpOn&&bVid){try{bVid.pause()}catch(_){}syncBToA(true)}snapToFrame()});
     prevBtn.onclick=()=>seekFrame(dispFrame()-1);
     nextBtn.onclick=()=>seekFrame(dispFrame()+1);
     fpsSel.onchange=async()=>{FPS=parseInt(fpsSel.value);v.fps=FPS;await persist();setupDuration();sync(true)};
@@ -3622,17 +3621,17 @@ function openReview(nodeId,versionId,opts){
   /* B を A に同期：停止・シーク中は厳密に、再生中はドリフト補正のみ */
   function syncBToA(hard){
     if(!cmpOn||!bVid)return;
-    /* 停止・シーク・コマ送り時は厳密にフレーム一致（再生速度も戻す） */
-    if(hard||media.paused){const t=Math.min(media.currentTime,(bVid.duration||media.currentTime));if(Math.abs((bVid.currentTime||0)-t)>0.004){try{bVid.currentTime=t}catch(_){}}bVid.playbackRate=media.playbackRate||1;}
+    /* 停止・シーク・コマ送り時は厳密にフレーム一致（B の再生速度は一切変更しない） */
+    if(hard||media.paused){const t=Math.min(media.currentTime,(bVid.duration||media.currentTime));if(Math.abs((bVid.currentTime||0)-t)>0.002){bSeekBusy=true;try{bVid.currentTime=t}catch(_){bSeekBusy=false}}}
   }
-  /* 再生中の追従：ハードシークはカクつくため、B の再生速度を微調整して A に連続的にロックする
-     （2つの video は decode タイミングでどうしてもドリフトするため、rAF ごとに補正） */
-  function correctBRate(){
-    if(!cmpOn||!bVid||!bVid.duration)return;
-    const base=media.playbackRate||1;
-    const diff=Math.min(media.currentTime,bVid.duration)-bVid.currentTime; /* +ならBが遅れている */
-    if(Math.abs(diff)>0.2){try{bVid.currentTime=Math.min(media.currentTime,bVid.duration)}catch(_){}bVid.playbackRate=base;return}
-    bVid.playbackRate=Math.max(0.25,Math.min(2,base+diff*4)); /* 遅れ→少し速く / 進み→少し遅く */
+  /* 再生中の追従：A を唯一のマスター（native再生・速度は絶対に変えない）とし、
+     B は自前で再生させず A の現在時刻へ毎フレーム精密シークして同フレームを表示する。
+     → 再生速度を変えずに常に同一フレームで揃う（B は seek 完了ごとに更新）。 */
+  function cmpFrameSync(){
+    if(!cmpOn||!bVid||!bVid.duration||media.paused||scrubbing)return;
+    if(bSeekBusy)return; /* 前のシーク完了までは新規シークを積まない（キュー詰まり防止） */
+    const t=Math.min(media.currentTime,bVid.duration);
+    if(Math.abs((bVid.currentTime||0)-t)>0.0005){bSeekBusy=true;try{bVid.currentTime=t}catch(_){bSeekBusy=false}}
   }
   /* 比較モードに入る：B ペインを右に追加し動画を読み込む（A の transport に追従） */
   function enterCompare(bNode,bVer){
@@ -3643,6 +3642,7 @@ function openReview(nodeId,versionId,opts){
       paneB=el('div','fb-pane-b');
       const lab=el('div','fb-pane-lab b');lab.textContent=blab;paneB.appendChild(lab);
       bVid=el('video');bVid.muted=true;bVid.playsInline=true;bVid.preload='auto';paneB.appendChild(bVid);
+      bVid.addEventListener('seeked',()=>{bSeekBusy=false}); /* シーク完了で次フレームのシークを許可 */
       const bx=el('button','fb-pane-x','✕ 比較終了');bx.title='比較表示を終了';bx.onclick=exitCompare;paneB.appendChild(bx);
       mediaRow.appendChild(paneB);
       /* A ペインにもラベル（比較中のみ表示） */
@@ -3653,7 +3653,7 @@ function openReview(nodeId,versionId,opts){
     fit();
   }
   function exitCompare(){
-    if(!cmpOn)return;cmpOn=false;
+    if(!cmpOn)return;cmpOn=false;bSeekBusy=false;
     if(bVid){try{bVid.pause()}catch(_){}}
     if(paneB){paneB.remove();paneB=null}bVid=null;
     const la=wrap.querySelector('.fb-pane-lab');if(la)la.remove();
@@ -3836,7 +3836,7 @@ function openReview(nodeId,versionId,opts){
     if(isVideo){
       const f=dispFrame();
       if(f!==lastFrame||force){lastFrame=f;refreshView()}
-      if(cmpOn&&bVid&&!media.paused&&!scrubbing)correctBRate(); /* 再生中は毎フレーム B の速度を微調整して A にロック */
+      if(cmpOn&&bVid&&!media.paused&&!scrubbing)cmpFrameSync(); /* 再生中は毎フレーム B を A の現在フレームへ精密シーク（速度は変えない） */
       requestAnimationFrame(()=>sync(false));
     }else drawAll();
   }
