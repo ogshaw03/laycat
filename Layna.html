@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.17';
+const APP_VERSION='2026.07.09.18';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2599,8 +2599,11 @@ function paintHead(ctx,W,H,s,alpha){
   /* 正面マーカー（鼻＝+Z方向）＝向きの目印。裏を向いたら非表示 */
   const nose=rotv(0,0,1);
   if(nose[2]>=0){const nx=cx+R*nose[0],ny=cy-R*nose[1];ctx.beginPath();ctx.arc(nx,ny,Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}
-  /* 中心（移動ハンドル） */
-  ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.6;ctx.fill();
+  /* 移動ハンドル（中心の円。ここをドラッグ＝移動、外側の球面＝回転） */
+  const hr=R*0.24;
+  ctx.beginPath();ctx.arc(cx,cy,hr,0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.13;ctx.fill();
+  ctx.beginPath();ctx.arc(cx,cy,hr,0,2*Math.PI);ctx.strokeStyle=col;ctx.globalAlpha=alpha*0.5;ctx.lineWidth=Math.max(1,R*0.012);ctx.setLineDash([R*0.05,R*0.05]);ctx.stroke();ctx.setLineDash([]);
+  ctx.beginPath();ctx.arc(cx,cy,Math.max(1.5,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();
   ctx.restore();
 }
 /* ブラシ型消しゴム：半径内の点だけを取り除き、残った区間で線を分割。
@@ -3923,14 +3926,14 @@ function openReview(nodeId,versionId,opts){
     const d=Math.hypot(s.cx-x,(s.cy-y)*aspect);
     let mode='rotate';
     if(e.shiftKey)mode='roll';else if(e.altKey)mode='size';
-    else if(hit&&d<(s.r||0.12)*0.33)mode='move'; /* 既存ガイドの中心付近＝移動（新規配置は回転で開始） */
+    else if(hit&&d<(s.r||0.12)*0.24)mode='move'; /* 中心の移動ハンドル内＝移動（新規配置は回転で開始） */
     headDrag={s,mode,sx:e.clientX,sy:e.clientY,yaw0:s.yaw,pitch0:s.pitch,roll0:s.roll,r0:s.r,cx0:s.cx,cy0:s.cy};
     headActive=s;drawAll();drawTimeline();updSubmit();
   }
   function headPointerMove(e){
     if(!headDrag)return;const r=canvas.getBoundingClientRect();
     const ndx=(e.clientX-headDrag.sx)/r.width,ndy=(e.clientY-headDrag.sy)/r.height;const s=headDrag.s;
-    if(headDrag.mode==='rotate'){s.yaw=headDrag.yaw0+ndx*Math.PI*2;s.pitch=headDrag.pitch0+ndy*Math.PI*2;}
+    if(headDrag.mode==='rotate'){const cr=Math.cos(headDrag.roll0),sr=Math.sin(headDrag.roll0);const ldx=ndx*cr+ndy*sr,ldy=-ndx*sr+ndy*cr;s.yaw=headDrag.yaw0+ldx*Math.PI*2;s.pitch=headDrag.pitch0+ldy*Math.PI*2;} /* ロール分だけドラッグ方向を補正し、画面基準で回す */
     else if(headDrag.mode==='roll'){s.roll=headDrag.roll0+ndx*Math.PI*2;}
     else if(headDrag.mode==='size'){s.r=Math.max(0.03,Math.min(0.6,headDrag.r0+ndx));}
     else if(headDrag.mode==='move'){s.cx=headDrag.cx0+ndx;s.cy=headDrag.cy0+ndy;}
