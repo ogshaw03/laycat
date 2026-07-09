@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.21';
+const APP_VERSION='2026.07.09.22';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -3587,7 +3587,7 @@ function openReview(nodeId,versionId,opts){
   body.appendChild(stage);
 
   /* --- ズーム / トラック（寄った状態でアノテ描画可） --- */
-  const Zm={s:1,x:0,y:0,rot:0,hand:false,panning:false,spinning:false,px:0,py:0,scx:0,scy:0,sa0:0,sr0:0};
+  const Zm={s:1,x:0,y:0,rot:0,hand:false,panning:false,spinning:false,zooming:false,px:0,py:0,sx0:0,sr0:0,zx0:0,zs0:1,zcx:0,zcy:0};
   function applyZoom(){zoomEl.style.transform='translate('+Zm.x+'px,'+Zm.y+'px) scale('+Zm.s+')';rotEl.style.transform='rotate('+Zm.rot+'deg)';zoomLab.textContent=Math.round(Zm.s*100)+'%'+(Math.round(Zm.rot)?' '+Math.round(Zm.rot)+'°':'')}
   function zoomTo(ns,cx,cy){
     ns=Math.max(1,Math.min(8,ns));
@@ -3603,27 +3603,35 @@ function openReview(nodeId,versionId,opts){
   zrBtn.onclick=()=>{Zm.rot=0;zoomTo(1);applyZoom()}; /* 等倍：ズーム・パン・回転をリセット */
   handBtn.onclick=()=>{Zm.hand=!Zm.hand;handBtn.classList.toggle('active',Zm.hand);if(Zm.hand)setTool(null);wrap.style.cursor=Zm.hand?'grab':''};
   wrap.addEventListener('wheel',e=>{e.preventDefault();const r=wrap.getBoundingClientRect();zoomTo(Zm.s*(e.deltaY<0?1.15:1/1.15),e.clientX-r.left,e.clientY-r.top)},{passive:false});
-  /* クリスタ風：Shift+Space+ドラッグで画面回転 */
+  /* クリスタ風：Space+ドラッグ=パン、Shift+Space+ドラッグ=回転、Ctrl+Space+ドラッグ=ズーム */
   let spaceDown=false;
-  function fbKeyDownSpin(e){if(e.code==='Space'){spaceDown=true;if(e.shiftKey){wrap.style.cursor='alias';e.preventDefault()}}}
+  const fbCur=e=>e&&e.shiftKey?'alias':(e&&(e.ctrlKey||e.metaKey)?'zoom-in':'grab');
+  function fbKeyDownSpin(e){if(e.code==='Space'){spaceDown=true;wrap.style.cursor=fbCur(e);if(e.shiftKey||e.ctrlKey||e.metaKey)e.preventDefault()}}
   function fbKeyUpSpin(e){if(e.code==='Space'){spaceDown=false;wrap.style.cursor=Zm.hand?'grab':''}}
   document.addEventListener('keydown',fbKeyDownSpin);document.addEventListener('keyup',fbKeyUpSpin);
+  /* スクリーン座標→回転前(zoomEl)座標系のwrapローカルへ（ズーム中心用） */
+  const spinLocal=(clientX,clientY)=>{const wr=wrap.getBoundingClientRect();const x=clientX-wr.left,y=clientY-wr.top;const rad=-Zm.rot*Math.PI/180,ccx=wr.width/2,ccy=wr.height/2,dx=x-ccx,dy=y-ccy;return [dx*Math.cos(rad)-dy*Math.sin(rad)+ccx, dx*Math.sin(rad)+dy*Math.cos(rad)+ccy];};
   wrap.addEventListener('pointerdown',e=>{
-    if(spaceDown&&e.shiftKey){ /* 回転開始（中心まわり） */
-      const wr=wrap.getBoundingClientRect();Zm.scx=wr.left+wr.width/2;Zm.scy=wr.top+wr.height/2;
-      Zm.spinning=true;Zm.sa0=Math.atan2(e.clientY-Zm.scy,e.clientX-Zm.scx);Zm.sr0=Zm.rot;
-      try{wrap.setPointerCapture(e.pointerId)}catch(_){}wrap.style.cursor='grabbing';e.preventDefault();return;
+    if(spaceDown&&e.shiftKey){ /* 回転：ビュー中心を軸に、横方向のドラッグ量で回す（クリスタ準拠） */
+      Zm.spinning=true;Zm.sx0=e.clientX;Zm.sr0=Zm.rot;try{wrap.setPointerCapture(e.pointerId)}catch(_){}wrap.style.cursor='grabbing';e.preventDefault();return;
     }
-    if(!(Zm.hand||e.button===1))return;
+    if(spaceDown&&(e.ctrlKey||e.metaKey)){ /* ズーム：横方向のドラッグ量で拡大縮小。開始点を基準に */
+      Zm.zooming=true;Zm.zx0=e.clientX;Zm.zs0=Zm.s;const lp=spinLocal(e.clientX,e.clientY);Zm.zcx=lp[0];Zm.zcy=lp[1];try{wrap.setPointerCapture(e.pointerId)}catch(_){}wrap.style.cursor='zoom-in';e.preventDefault();return;
+    }
+    if(!(Zm.hand||spaceDown||e.button===1))return; /* Space単体=パン（手のひら）、✋トラック、中ボタンも */
     Zm.panning=true;Zm.px=e.clientX;Zm.py=e.clientY;
     try{wrap.setPointerCapture(e.pointerId)}catch(_){}
     wrap.style.cursor='grabbing';e.preventDefault();
   });
   wrap.addEventListener('pointermove',e=>{
-    if(Zm.spinning){const a=Math.atan2(e.clientY-Zm.scy,e.clientX-Zm.scx);Zm.rot=Zm.sr0+(a-Zm.sa0)*180/Math.PI;applyZoom();return}
-    if(!Zm.panning)return;Zm.x+=e.clientX-Zm.px;Zm.y+=e.clientY-Zm.py;Zm.px=e.clientX;Zm.py=e.clientY;applyZoom();
+    if(Zm.spinning){Zm.rot=Zm.sr0+(e.clientX-Zm.sx0)*0.35;applyZoom();return}
+    if(Zm.zooming){const ns=Zm.zs0*Math.exp((e.clientX-Zm.zx0)*0.006);zoomTo(ns,Zm.zcx,Zm.zcy);return}
+    if(!Zm.panning)return;
+    const rad=Zm.rot*Math.PI/180,mdx=e.clientX-Zm.px,mdy=e.clientY-Zm.py; /* 回転中もドラッグ方向にパンするよう補正 */
+    Zm.x+=mdx*Math.cos(rad)+mdy*Math.sin(rad);Zm.y+=-mdx*Math.sin(rad)+mdy*Math.cos(rad);
+    Zm.px=e.clientX;Zm.py=e.clientY;applyZoom();
   });
-  wrap.addEventListener('pointerup',()=>{Zm.panning=false;Zm.spinning=false;wrap.style.cursor=(Zm.hand||spaceDown)?'grab':''});
+  wrap.addEventListener('pointerup',()=>{Zm.panning=false;Zm.spinning=false;Zm.zooming=false;wrap.style.cursor=(Zm.hand||spaceDown)?'grab':''});
 
   /* --- レイヤーパネル（動画右側・プレビュー付き縦並び） --- */
   const layersPanel=el('div','fb-layers');
