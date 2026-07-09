@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.19';
+const APP_VERSION='2026.07.09.20';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2585,17 +2585,17 @@ function paintHead(ctx,W,H,s,alpha){
   /* 球の外周シルエット */
   ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1,R*0.02);ctx.stroke();
   /* 点列を投影して描画。全周描き、奥側は薄めにして立体感を残す */
-  function poly(pts,wf){
+  function poly(pts,wf,op){op=(op==null?1:op);
     let prev=null,pf=false;
     for(const q of pts){const p=proj(q);const front=p[2]>=-0.02;
-      if(prev&&front&&pf){ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();} /* 手前(球の前面)のみ描画・裏側は非表示 */
+      if(prev&&front&&pf){ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha*op;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();} /* 手前(球の前面)のみ描画・裏側は非表示 */
       prev=p;pf=front;
     }
     ctx.globalAlpha=alpha;
   }
   const ring=fn=>{const a=[];for(let i=0;i<=56;i++){const t=i/56*2*Math.PI;a.push(fn(t));}return a;};
-  poly(ring(t=>[0,Math.sin(t),Math.cos(t)]),0.04);  /* 正中線（縦の大円） */
-  poly(ring(t=>[Math.sin(t),0,Math.cos(t)]),0.03);  /* アイライン（横の大円） */
+  poly(ring(t=>[Math.sin(t),0,Math.cos(t)]),0.03,0.4);  /* アイライン（横の大円）＝薄く（縦の正中線と区別） */
+  poly(ring(t=>[0,Math.sin(t),Math.cos(t)]),0.04);      /* 正中線（縦の大円）＝濃く */
   /* 正面マーカー（鼻＝+Z方向）＝向きの目印。裏を向いたら非表示 */
   const nose=rotv(0,0,1);
   if(nose[2]>=0){const nx=cx+R*nose[0],ny=cy-R*nose[1];ctx.beginPath();ctx.arc(nx,ny,Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}
@@ -3943,7 +3943,7 @@ function openReview(nodeId,versionId,opts){
     if(!headDrag)return;const r=canvas.getBoundingClientRect();
     const ndx=(e.clientX-headDrag.sx)/r.width,ndy=(e.clientY-headDrag.sy)/r.height;const s=headDrag.s;
     if(headDrag.mode==='rotate'){const cr=Math.cos(headDrag.roll0),sr=Math.sin(headDrag.roll0);const ldx=ndx*cr+ndy*sr,ldy=-ndx*sr+ndy*cr;s.yaw=headDrag.yaw0+ldx*Math.PI*2;s.pitch=headDrag.pitch0+ldy*Math.PI*2;} /* ロール分だけドラッグ方向を補正し、画面基準で回す */
-    else if(headDrag.mode==='roll'){const scx=r.left+s.cx*r.width,scy=r.top+s.cy*r.height;const ang1=Math.atan2(e.clientY-scy,e.clientX-scx);s.roll=headDrag.roll0+(ang1-headDrag.ang0);} /* 掴んだ点が指に追従＝上下どちらでも自然に回る */
+    else if(headDrag.mode==='roll'){const scx=r.left+s.cx*r.width,scy=r.top+s.cy*r.height;const ang1=Math.atan2(e.clientY-scy,e.clientX-scx);s.roll=headDrag.roll0-(ang1-headDrag.ang0);} /* 掴んだ点が指に追従（回転方向は反転） */
     else if(headDrag.mode==='size'){s.r=Math.max(0.03,Math.min(0.6,headDrag.r0+ndx));}
     else if(headDrag.mode==='move'){s.cx=headDrag.cx0+ndx;s.cy=headDrag.cy0+ndy;}
     drawAll();
