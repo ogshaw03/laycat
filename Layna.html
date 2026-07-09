@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.7';
+const APP_VERSION='2026.07.09.8';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2581,13 +2581,13 @@ function paintHead(ctx,W,H,s,alpha){
   }
   const proj=p=>{const r=rotv(p[0],p[1],p[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
-  /* ひし形（八面体）ワイヤー：前方(+Z)頂点＝鼻先の角。前面のセグメントのみ表示 */
-  const seg=(a,b,wf)=>{const pa=proj(a),pb=proj(b);if(pa[2]>=-0.02&&pb[2]>=-0.02){ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();}};
+  /* ひし形（八面体）ワイヤー：前方(+Z)頂点＝鼻先の角。奥側の辺も消さず薄く表示して形を保つ */
+  const seg=(a,b,wf)=>{const pa=proj(a),pb=proj(b);const back=pa[2]<-0.05&&pb[2]<-0.05;ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha*(back?0.35:1);ctx.lineWidth=Math.max(1.3,R*wf*(back?0.85:1));ctx.stroke();ctx.globalAlpha=alpha;};
   const U=[0,1,0.05],D=[0,-1,0.05],L=[-1,0,0],Rp=[1,0,0],F=[0,-0.05,1.34],B=[0,0,-1];
-  [[U,F],[F,D],[L,F],[F,Rp]].forEach(([a,b])=>seg(a,b,0.05));   /* 鼻先へ集まる前稜（正中線・アイラインの前半） */
-  [[U,Rp],[Rp,D],[D,L],[L,U]].forEach(([a,b])=>seg(a,b,0.032)); /* 正面のひし形輪郭（赤道の菱形） */
-  [[U,B],[D,B],[L,B],[Rp,B]].forEach(([a,b])=>seg(a,b,0.03));   /* 奥側（後頂点まわり）＝前面判定で自動的に非表示 */
-  {const pf=proj(F);if(pf[2]>=0){ctx.beginPath();ctx.arc(pf[0],pf[1],Math.max(1.6,R*0.055),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}} /* 鼻先の角を強調 */
+  [[U,Rp],[Rp,D],[D,L],[L,U]].forEach(([a,b])=>seg(a,b,0.032)); /* 赤道のひし形輪郭 */
+  [[U,B],[B,D],[L,B],[B,Rp]].forEach(([a,b])=>seg(a,b,0.03));   /* 後頂点へ集まる稜（奥・薄め） */
+  [[U,F],[F,D],[L,F],[F,Rp]].forEach(([a,b])=>seg(a,b,0.05));   /* 鼻先へ集まる前稜 */
+  {const pf=proj(F);ctx.beginPath();ctx.arc(pf[0],pf[1],Math.max(1.6,R*0.055),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*(pf[2]<0?0.4:1);ctx.fill();ctx.globalAlpha=alpha;} /* 鼻先の角 */
   /* 中心（移動ハンドル） */
   ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.6;ctx.fill();
   ctx.restore();
