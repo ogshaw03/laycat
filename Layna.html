@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.24';
+const APP_VERSION='2026.07.09.25';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -3609,14 +3609,19 @@ function openReview(nodeId,versionId,opts){
   function fbKeyDownSpin(e){const t=e.target&&e.target.tagName;if(t==='TEXTAREA'||t==='INPUT')return;if(e.code==='Space'){if(!spaceDown)spaceDrag=false;spaceDown=true;wrap.style.cursor=fbCur(e);e.preventDefault()}}
   function fbKeyUpSpin(e){const t=e.target&&e.target.tagName;if(t==='TEXTAREA'||t==='INPUT')return;if(e.code==='Space'){spaceDown=false;if(!spaceDrag&&isVideo&&document.getElementById('fbOverlay')){try{playBtn.onclick()}catch(_){}}wrap.style.cursor=Zm.hand?'grab':''}} /* Spaceタップ=再生／Space+ドラッグ=パン等（再生しない） */
   document.addEventListener('keydown',fbKeyDownSpin);document.addEventListener('keyup',fbKeyUpSpin);
-  /* スクリーン座標→回転前(zoomEl)座標系のwrapローカルへ（ズーム中心用） */
+  wrap.addEventListener('contextmenu',e=>e.preventDefault()); /* 右ドラッグズーム中にメニューを出さない */
+  /* スクリーン座標→回転前(zoomEl)座標系のwrパローカルへ（ズーム中心用） */
   const spinLocal=(clientX,clientY)=>{const wr=wrap.getBoundingClientRect();const x=clientX-wr.left,y=clientY-wr.top;const rad=-Zm.rot*Math.PI/180,ccx=wr.width/2,ccy=wr.height/2,dx=x-ccx,dy=y-ccy;return [dx*Math.cos(rad)-dy*Math.sin(rad)+ccx, dx*Math.sin(rad)+dy*Math.cos(rad)+ccy];};
+  const startZoomDrag=e=>{Zm.zooming=true;Zm.zx0=e.clientX;Zm.zs0=Zm.s;const lp=spinLocal(e.clientX,e.clientY);Zm.zcx=lp[0];Zm.zcy=lp[1];try{wrap.setPointerCapture(e.pointerId)}catch(_){}wrap.style.cursor='zoom-in';e.preventDefault();};
   wrap.addEventListener('pointerdown',e=>{
     if(spaceDown&&e.shiftKey){ /* 回転：ビュー中心を軸に、横方向のドラッグ量で回す（クリスタ準拠） */
       spaceDrag=true;Zm.spinning=true;Zm.sx0=e.clientX;Zm.sr0=Zm.rot;try{wrap.setPointerCapture(e.pointerId)}catch(_){}wrap.style.cursor='grabbing';e.preventDefault();return;
     }
     if(spaceDown&&(e.ctrlKey||e.metaKey)){ /* ズーム：横方向のドラッグ量で拡大縮小。開始点を基準に */
-      spaceDrag=true;Zm.zooming=true;Zm.zx0=e.clientX;Zm.zs0=Zm.s;const lp=spinLocal(e.clientX,e.clientY);Zm.zcx=lp[0];Zm.zcy=lp[1];try{wrap.setPointerCapture(e.pointerId)}catch(_){}wrap.style.cursor='zoom-in';e.preventDefault();return;
+      spaceDrag=true;startZoomDrag(e);return;
+    }
+    if(e.button===2&&!e.altKey){ /* 右クリック＋水平ドラッグでズーム（Alt+右はブラシサイズ調整に譲る） */
+      startZoomDrag(e);return;
     }
     if(!(Zm.hand||spaceDown||e.button===1))return; /* Space単体=パン（手のひら）、✋トラック、中ボタンも */
     if(spaceDown)spaceDrag=true;
