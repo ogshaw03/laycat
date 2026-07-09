@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.6';
+const APP_VERSION='2026.07.09.7';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2581,29 +2581,15 @@ function paintHead(ctx,W,H,s,alpha){
   }
   const proj=p=>{const r=rotv(p[0],p[1],p[2]);return [cx+R*r[0],cy-R*r[1],r[2]];};
   ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
-  /* 球の外周シルエット */
-  ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1,R*0.02);ctx.stroke();
-  /* 点列を投影して前面セグメントのみ描画（奥側は非表示） */
-  function poly(pts,wf){
-    let prev=null,pf=false;
-    for(const q of pts){const p=proj(q);const front=p[2]>=-0.03;
-      if(prev&&front&&pf){ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();}
-      prev=p;pf=front;
-    }
-    ctx.globalAlpha=alpha;
-  }
-  const ring=fn=>{const a=[];for(let i=0;i<=56;i++){const t=i/56*2*Math.PI;a.push(fn(t));}return a;};
-  const seg=(a,b,wf)=>{const pa=proj(a),pb=proj(b);if(pa[2]>=-0.03&&pb[2]>=-0.03){ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();}};
-  poly(ring(t=>[0,Math.sin(t),Math.cos(t)]),0.045);  /* 正中線（縦） */
-  poly(ring(t=>[Math.sin(t),0,Math.cos(t)]),0.03);   /* アイライン（横） */
-  /* 鼻先の「角」：正面(+Z)へ突き出した頂点に稜線を集める */
-  const N=[0,-0.05,1.34];
-  seg(N,[0,0.36,0.93],0.045);    /* 鼻筋（上へ） */
-  seg(N,[-0.52,-0.1,0.85],0.04); /* 左の稜 */
-  seg(N,[0.52,-0.1,0.85],0.04);  /* 右の稜 */
-  seg(N,[0,-0.55,0.84],0.038);   /* 下（人中〜顎方向） */
+  /* ひし形（八面体）ワイヤー：前方(+Z)頂点＝鼻先の角。前面のセグメントのみ表示 */
+  const seg=(a,b,wf)=>{const pa=proj(a),pb=proj(b);if(pa[2]>=-0.02&&pb[2]>=-0.02){ctx.beginPath();ctx.moveTo(pa[0],pa[1]);ctx.lineTo(pb[0],pb[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();}};
+  const U=[0,1,0.05],D=[0,-1,0.05],L=[-1,0,0],Rp=[1,0,0],F=[0,-0.05,1.34],B=[0,0,-1];
+  [[U,F],[F,D],[L,F],[F,Rp]].forEach(([a,b])=>seg(a,b,0.05));   /* 鼻先へ集まる前稜（正中線・アイラインの前半） */
+  [[U,Rp],[Rp,D],[D,L],[L,U]].forEach(([a,b])=>seg(a,b,0.032)); /* 正面のひし形輪郭（赤道の菱形） */
+  [[U,B],[D,B],[L,B],[Rp,B]].forEach(([a,b])=>seg(a,b,0.03));   /* 奥側（後頂点まわり）＝前面判定で自動的に非表示 */
+  {const pf=proj(F);if(pf[2]>=0){ctx.beginPath();ctx.arc(pf[0],pf[1],Math.max(1.6,R*0.055),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}} /* 鼻先の角を強調 */
   /* 中心（移動ハンドル） */
-  ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.04),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.85;ctx.fill();
+  ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.6;ctx.fill();
   ctx.restore();
 }
 /* ブラシ型消しゴム：半径内の点だけを取り除き、残った区間で線を分割。
@@ -3929,7 +3915,7 @@ function openReview(nodeId,versionId,opts){
   function headPointerMove(e){
     if(!headDrag)return;const r=canvas.getBoundingClientRect();
     const ndx=(e.clientX-headDrag.sx)/r.width,ndy=(e.clientY-headDrag.sy)/r.height;const s=headDrag.s;
-    if(headDrag.mode==='rotate'){s.yaw=headDrag.yaw0+ndx*Math.PI*2;s.pitch=headDrag.pitch0-ndy*Math.PI*2;}
+    if(headDrag.mode==='rotate'){s.yaw=headDrag.yaw0+ndx*Math.PI*2;s.pitch=headDrag.pitch0+ndy*Math.PI*2;}
     else if(headDrag.mode==='roll'){s.roll=headDrag.roll0+ndx*Math.PI*2;}
     else if(headDrag.mode==='size'){s.r=Math.max(0.03,Math.min(0.6,headDrag.r0+ndx));}
     else if(headDrag.mode==='move'){s.cx=headDrag.cx0+ndx;s.cy=headDrag.cy0+ndy;}
