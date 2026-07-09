@@ -992,7 +992,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.13';
+const APP_VERSION='2026.07.09.14';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -2585,19 +2585,19 @@ function paintHead(ctx,W,H,s,alpha){
   ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.strokeStyle='rgba(255,255,255,.2)';ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1,R*0.02);ctx.stroke();
   /* 点列を投影して描画。全周描き、奥側は薄めにして立体感を残す */
   function poly(pts,wf){
-    let prev=null;
-    for(const q of pts){const p=proj(q);
-      if(prev){const back=prev[2]<-0.05&&p[2]<-0.05;ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha*(back?0.3:1);ctx.lineWidth=Math.max(1.4,R*wf*(back?0.85:1));ctx.stroke();}
-      prev=p;
+    let prev=null,pf=false;
+    for(const q of pts){const p=proj(q);const front=p[2]>=-0.02;
+      if(prev&&front&&pf){ctx.beginPath();ctx.moveTo(prev[0],prev[1]);ctx.lineTo(p[0],p[1]);ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=Math.max(1.4,R*wf);ctx.stroke();} /* 手前(球の前面)のみ描画・裏側は非表示 */
+      prev=p;pf=front;
     }
     ctx.globalAlpha=alpha;
   }
   const ring=fn=>{const a=[];for(let i=0;i<=56;i++){const t=i/56*2*Math.PI;a.push(fn(t));}return a;};
   poly(ring(t=>[0,Math.sin(t),Math.cos(t)]),0.04);  /* 正中線（縦の大円） */
   poly(ring(t=>[Math.sin(t),0,Math.cos(t)]),0.03);  /* アイライン（横の大円） */
-  /* 正面マーカー（鼻＝+Z方向）＝向きの目印 */
-  const nose=rotv(0,0,1);const nx=cx+R*nose[0],ny=cy-R*nose[1];
-  ctx.beginPath();ctx.arc(nx,ny,Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*(nose[2]>=0?1:0.35);ctx.fill();ctx.globalAlpha=alpha;
+  /* 正面マーカー（鼻＝+Z方向）＝向きの目印。裏を向いたら非表示 */
+  const nose=rotv(0,0,1);
+  if(nose[2]>=0){const nx=cx+R*nose[0],ny=cy-R*nose[1];ctx.beginPath();ctx.arc(nx,ny,Math.max(1.6,R*0.05),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.fill();}
   /* 中心（移動ハンドル） */
   ctx.beginPath();ctx.arc(cx,cy,Math.max(2,R*0.03),0,2*Math.PI);ctx.fillStyle=col;ctx.globalAlpha=alpha*0.6;ctx.fill();
   ctx.restore();
