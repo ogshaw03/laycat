@@ -571,18 +571,34 @@ button .ico,.tree-row .ico,.hs-item .ico,.tl-title .ico,.breadcrumb .ico,.type-c
 .cmp-search{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);padding:6px 10px;font-size:13px;width:240px;font-family:inherit}
 .cmp-search:focus{outline:none;border-color:var(--border2)}
 .cmp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;align-content:start}
-.cmp-tile{border:1px solid var(--border);border-radius:9px;background:var(--bg);overflow:hidden;cursor:pointer;transition:border-color .1s,transform .1s}
-.cmp-tile:hover{border-color:var(--edge);transform:translateY(-1px)}
-.cmp-tile .th{width:100%;aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3)}
-.cmp-tile .info{padding:7px 9px 9px}
-.cmp-tile .info .pth{font-size:11px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cmp-tile .info .vr{display:flex;align-items:center;gap:6px;margin-top:3px}
-.cmp-tile .info .vnm{font-size:11px;color:var(--text2)}
-.cmp-tile .info .vcur{font-size:9px;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:0 5px;line-height:15px}
-.cmp-tile .info .vcur.cur{color:var(--edge);border-color:var(--edge)}
-.cmp-tile.cur{border-color:var(--border2)}
-.cmp-tile.self{opacity:.5;cursor:default}
-.cmp-tile.self:hover{border-color:var(--border);transform:none}
+/* ショットタイル（閉：縦タイル／開：全幅・工程タイルを展開） */
+.cmp-shot{border:1px solid var(--border);border-radius:9px;background:var(--bg);overflow:hidden;transition:border-color .1s}
+.cmp-shot:hover{border-color:var(--edge)}
+.cmp-shot .cmp-shot-hd{display:flex;flex-direction:column;cursor:pointer}
+.cmp-shot .th{width:100%;aspect-ratio:16/9;background:#000 center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text3)}
+.cmp-shot .info{padding:7px 9px 9px}
+.cmp-shot .info .pth{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmp-shot .info .nm{font-size:12px;color:var(--text);font-weight:600}
+.cmp-shot .info .cnt{font-size:10px;color:var(--text3);margin-top:2px}
+.cmp-shot .cmp-caret{display:none}
+.cmp-shot.open{grid-column:1/-1;border-color:var(--border2)}
+.cmp-shot.open .cmp-shot-hd{flex-direction:row;align-items:center;gap:10px;padding:8px 10px}
+.cmp-shot.open .th{width:64px;height:36px;aspect-ratio:auto;border-radius:4px;flex-shrink:0}
+.cmp-shot.open .info{padding:0;flex:1;min-width:0}
+.cmp-shot.open .cmp-caret{display:block;color:var(--text3);flex-shrink:0;padding-right:4px}
+.cmp-tasks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:0 10px 10px;border-top:1px solid var(--border)}
+.cmp-task{border:1px solid var(--border);border-radius:7px;background:var(--bg2);padding:7px 9px;cursor:pointer;transition:border-color .1s}
+.cmp-task.multi{cursor:default}
+.cmp-task:hover{border-color:var(--edge)}
+.cmp-task.multi:hover{border-color:var(--border)}
+.cmp-task .tnm{font-size:12px;color:var(--text);font-weight:600;display:flex;align-items:center;gap:6px}
+.cmp-task .tsub{font-size:10px;color:var(--text3);margin-top:2px}
+.cmp-task.self{opacity:.5;cursor:default}
+.cmp-task .vcur{font-size:9px;color:var(--text3);border:1px solid var(--border2);border-radius:4px;padding:0 5px;line-height:15px;font-weight:400}
+.cmp-vchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.cmp-vchip{font-size:10px;padding:2px 8px;border:1px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-family:inherit}
+.cmp-vchip:hover{border-color:var(--edge);color:var(--text)}
+.cmp-vchip.self{opacity:.6;cursor:default;border-style:dashed}
 .fb-top{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
 .fb-title{font-family:var(--font-head);font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fb-fs{flex-shrink:0}
@@ -5179,30 +5195,64 @@ function openComparePicker(aNode,aVer,onPick){
   const pkh=el('div','pkh');pkh.appendChild(el('div',null,'比較する動画を選択'));const hsp=el('div');hsp.style.flex='1';pkh.appendChild(hsp);
   const search=el('input','cmp-search');search.type='text';search.placeholder='🔍 ショット・工程を検索';pkh.appendChild(search);
   const pkb=el('div','pkb');const list=el('div','cmp-grid');pkb.appendChild(list);
-  /* 各工程の各版を1タイルに展開（グリッド表示）。現在の工程の版を先頭にまとめる */
-  const items=[];
-  const ordered=revs.slice().sort((x,y)=>(x.id===aNode.id?-1:0)-(y.id===aNode.id?-1:0)); /* 現在の工程を先頭に */
-  for(const n of ordered){
-    const path=pathOf(n.id).slice(1).map(x=>x.name).join(' / ');
-    for(const vv of n.versions.filter(x=>x.type==='video').slice().reverse()){
-      items.push({node:n,ver:vv,path,cur:(n.id===aNode.id),self:(n.id===aNode.id&&vv.id===aVer.id)});
-    }
+  /* ショット（工程の親セクション）でグループ化。ショットを開くと配下の工程タイルが下に出る */
+  const curShotId=aNode.parentId; /* 比較元の工程が属するショット */
+  const groups=[];const gmap=new Map();
+  for(const n of revs){
+    const sid=n.parentId;
+    if(!gmap.has(sid)){const g={id:sid,shot:getNode(sid),revs:[]};gmap.set(sid,g);groups.push(g)}
+    gmap.get(sid).revs.push(n);
   }
+  groups.sort((a,b)=>(a.id===curShotId?-1:0)-(b.id===curShotId?-1:0)); /* 現在のショットを先頭に */
+  const openSet=new Set([curShotId]); /* 既定で現在のショットを開いておく */
+  const vidsOf=n=>n.versions.filter(x=>x.type==='video').slice().reverse();
+  function taskMatch(n,q){return (n.name+' '+n.versions.map(v=>v.name).join(' ')).toLowerCase().includes(q)}
   function paint(){
     list.innerHTML='';const q=(search.value||'').trim().toLowerCase();let shown=0;
-    for(const it of items){
-      if(q&&!(it.node.name+' '+it.path+' '+it.ver.name).toLowerCase().includes(q))continue;
+    for(const g of groups){
+      const shotName=g.shot?g.shot.name:root.name;
+      const path=g.shot?pathOf(g.shot.id).slice(1,-1).map(x=>x.name).join(' / '):'';
+      const shotHit=shotName.toLowerCase().includes(q);
+      const visRevs=(q&&!shotHit)?g.revs.filter(n=>taskMatch(n,q)):g.revs;
+      if(q&&!shotHit&&!visRevs.length)continue;
       shown++;
-      const tile=el('div','cmp-tile'+(it.self?' self':'')+(it.cur?' cur':''));
-      const th=el('div','th');if(it.ver.thumb)storage.getURL(it.ver.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
-      tile.appendChild(th);
-      const info=el('div','info');
-      info.appendChild(el('div','pth',(it.path?it.path+' / ':'')+it.node.name));
-      const vr=el('div','vr');vr.appendChild(el('span','vnm',it.ver.name));
-      if(it.self)vr.appendChild(el('span','vcur','比較元'));else if(it.cur)vr.appendChild(el('span','vcur cur','現在の工程'));
-      info.appendChild(vr);tile.appendChild(info);
-      if(!it.self)tile.onclick=()=>{modal.remove();onPick(it.node,it.ver)};
-      list.appendChild(tile);
+      const isOpen=q?true:openSet.has(g.id); /* 検索中は該当を全て開く */
+      const card=el('div','cmp-shot'+(isOpen?' open':''));
+      const hd=el('div','cmp-shot-hd');
+      const th=el('div','th');const lv=latestVideoVersionUnder(g.id);if(lv&&lv.v.thumb)storage.getURL(lv.v.thumb).then(u=>{if(u)th.style.backgroundImage='url("'+u+'")'});else th.appendChild(icoEl('film'));
+      hd.appendChild(th);
+      const info=el('div','info');if(path)info.appendChild(el('div','pth',path));info.appendChild(el('div','nm',shotName));info.appendChild(el('div','cnt',g.revs.length+' 工程'+(g.id===curShotId?'・比較元のショット':'')));
+      hd.appendChild(info);
+      hd.appendChild(el('span','cmp-caret',isOpen?'▾':'▸'));
+      if(!q)hd.onclick=()=>{if(openSet.has(g.id))openSet.delete(g.id);else openSet.add(g.id);paint()};
+      card.appendChild(hd);
+      if(isOpen){
+        const tasks=el('div','cmp-tasks');
+        for(const n of visRevs){
+          const vids=vidsOf(n);
+          const task=el('div','cmp-task');
+          const tnm=el('div','tnm',n.name);task.appendChild(tnm);
+          if(vids.length<=1){
+            const only=vids[0];const self=(n.id===aNode.id&&only&&only.id===aVer.id);
+            task.appendChild(el('div','tsub',only?only.name:'—'));
+            if(self){task.classList.add('self');tnm.appendChild(el('span','vcur','比較元'))}
+            else if(only)task.onclick=()=>{modal.remove();onPick(n,only)};
+          }else{
+            const chips=el('div','cmp-vchips');
+            for(const vv of vids){
+              const self=(n.id===aNode.id&&vv.id===aVer.id);
+              const chip=el('button','cmp-vchip'+(self?' self':''),vv.name);
+              if(self)chip.appendChild(el('span','vcur','元'));
+              else chip.onclick=()=>{modal.remove();onPick(n,vv)};
+              chips.appendChild(chip);
+            }
+            task.classList.add('multi');task.appendChild(chips);
+          }
+          tasks.appendChild(task);
+        }
+        card.appendChild(tasks);
+      }
+      list.appendChild(card);
     }
     if(!shown)list.appendChild(el('div','sub-empty','動画のあるタスクがありません。'));
   }
