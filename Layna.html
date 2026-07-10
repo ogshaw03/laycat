@@ -923,7 +923,10 @@ const storage={
      フォルダ未設定なら保存できないため null を返す（呼び出し側で警告）。 */
   async putMedia(sub,fn,blob,opts){
     opts=opts||{};
-    if(opts.projectId){const ph=await this.projRoot(opts.projectId);if(ph){const dir=await this._subdir(sub,ph,true);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return 'p:'+opts.projectId+'|'+sub+'/'+fn}}
+    if(opts.projectId){const ph=await this.projRoot(opts.projectId);if(ph){
+      try{const dir=await this._subdir(sub,ph,true);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return 'p:'+opts.projectId+'|'+sub+'/'+fn}
+      catch(e){toast('ファイルの保存に失敗しました。フォルダの接続・空き容量・書き込み権限を確認してください');return null}
+    }}
     return null;
   },
   _parseRef(ref){if(ref.startsWith('p:')){const i=ref.indexOf('|');return{proj:ref.slice(2,i),path:ref.slice(i+1)}}return{proj:null,path:ref}},
@@ -959,8 +962,16 @@ function syncRegistryFromDb(){
 }
 /* 変更検知用キャッシュ（未変更のファイル書き込みを省略） */
 const _saveCache={local:'',reg:'',proj:{},reels:{}};
+/* persist は直列化する：並行して呼ばれても同一ファイルへの createWritable が競合しない
+   （File System Access API の NoModificationAllowedError / データ消失を防ぐ）。
+   各呼び出しはチェーンに積まれ、順番に実行される（未変更分は _saveCache でスキップされるため安価）。 */
+let _persistChain=Promise.resolve();
+function persist(){
+  _persistChain=_persistChain.then(()=>_persistNow()).catch(e=>{try{console.warn('persist failed',e)}catch(_){}});
+  return _persistChain;
+}
 /* 保存：グローバル(local=通知のみ)＋registry＋各プロジェクト（データ・リール、変更分のみ） */
-async function persist(){
+async function _persistNow(){
   if(!DB)return;
   syncRegistryFromDb();
   const local={notifications:DB.notifications};
@@ -1043,7 +1054,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.35';
+const APP_VERSION='2026.07.09.36';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -3662,7 +3673,7 @@ async function uploadVersion(node,file,ui,opts){
     const ext=(file.name.match(/\.[^.]+$/)||[''])[0];const id=newId('media');
     const sub=opts.sub||'media';const thumbSub=opts.sub?opts.sub+'/thumbnails':'thumbnails';const pm={projectId:opts.projectId};
     const mediaRef=await storage.putMedia(sub,id+ext,file,pm);
-    if(!mediaRef){ui.prog.classList.add('hidden');toast('保存先フォルダが未設定のため保存できません。プロジェクト設定でフォルダを指定してください');return}
+    if(!mediaRef){ui.prog.classList.add('hidden');toast('保存できませんでした。保存先フォルダの設定・接続・空き容量・書き込み権限を確認してください');return}
     let thumbRef=null;if(thumbDataUrl){const blob=await(await fetch(thumbDataUrl)).blob();thumbRef=await storage.putMedia(thumbSub,id+'.jpg',blob,pm)}else if(!isVideo)thumbRef=mediaRef;
     /* 名前：入力があればそれ、空欄なら動画のタイトル（拡張子なしのファイル名） */
     const vname=(opts.name&&opts.name.trim())||file.name.replace(/\.[^.]+$/,'');

@@ -35,10 +35,12 @@
   「REEL がロックを迂回」「REEL メンションのプロジェクト不一致」を解消。REEL コメントは `buildNotes` で
   `mentions`（`cta._mentions`）を渡し、ピッカーで選んだメンションid（同名個人の解決用）も反映。
 
+- **[中] `persist()` を直列化**（`_persistChain`）… 全 persist 呼び出しをチェーンで順次実行し、同一ファイルへの
+  `createWritable` の並行競合（`NoModificationAllowedError`）とデータ消失を防止。`putMedia` の書き込みも try/catch で保護。
+
 ## 未対応（残す）
 
 ### 中
-- **`persist()` に直列化がない**（915-931）… 並行呼び出しで同一 fileHandle への `createWritable` が競合し得る。単一の直列キューにする。
 - **`newId` が Date.now＋カウンタのみで複数ユーザー衝突あり**（810）… ユーザー/セッション由来のソルトや `crypto.randomUUID()` を混ぜる。
 - **再帰/ループ系に循環 parentId ガードなし**（`pathOf`/`rootOf`/`descendants`/`renderTreeNode`/`nodeStatus` 944-949 他）
   破損 JSON で無限ループ／スタックオーバーフロー。visited セットで防御。
