@@ -8,8 +8,8 @@
 
 | 用途 | URL |
 | ---- | ---- |
-| **本体（LayCAT）** | https://ogshaw03.github.io/Layna/ |
-| **アクセス管理コンソール** | https://ogshaw03.github.io/Layna/access-console.html |
+| **本体（LayCAT）** | https://ogshaw03.github.io/laycat/ |
+| **アクセス管理コンソール** | https://ogshaw03.github.io/laycat/access-console.html |
 
 - 本体は上記を開くだけで使えます（Chrome / Edge 推奨）。
 - アクセス管理コンソールは、ライブサイトにログインできるユーザー（許可メール／ドメイン）を管理する画面です（後述）。
@@ -58,7 +58,7 @@
 
 ## アクセス管理
 
-ライブサイト（`https://ogshaw03.github.io/Layna/`）では **Google ログイン**で入室可否を判定します（`github.io` 以外＝ローカル/exe/プレビューでは自動的に認証オフ）。
+ライブサイト（`https://ogshaw03.github.io/laycat/`）では **Google ログイン**で入室可否を判定します（`github.io` 以外＝ローカル/exe/プレビューでは自動的に認証オフ）。
 
 - 許可リストは **`access.json`**（git管理）で定義します。
   - `authRequired`：認証の有効/無効
