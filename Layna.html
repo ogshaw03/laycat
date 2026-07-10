@@ -1122,7 +1122,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.39';
+const APP_VERSION='2026.07.09.40';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
@@ -1723,7 +1723,7 @@ async function connectProjectFlow(){
   try{handle=await window.showDirectoryPicker({mode:'readwrite'})}catch(e){if(e&&e.name!=='AbortError')toast('フォルダ選択に失敗しました');return}
   let data=null;
   try{const fh=await handle.getFileHandle(storage._projFileName);data=JSON.parse(await (await fh.getFile()).text())}catch(e){data=null}
-  if(!data||!data.id||(!Array.isArray(data.nodes)&&!data.enc)){toast('選択したフォルダに Layna プロジェクトが見つかりません（layna.project.json が必要です）');return}
+  if(!data||!data.id||(!Array.isArray(data.nodes)&&!data.enc)){toast('選択したフォルダに LayCAT プロジェクトが見つかりません（layna.project.json が必要です）');return}
   await storage.setProjRoot(data.id,handle);
   /* 暗号化プロジェクト：中身はスタブのみ取り込み、解錠は開いたときに要求（封筒は保持） */
   if(data.enc){

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
-<title>Layna アクセス管理コンソール</title>
+<title>LayCAT アクセス管理コンソール</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet" />
 <style>
@@ -93,14 +93,14 @@
 <div class="overlay" id="loadingOverlay"><div class="muted">読み込み中...</div></div>
 
 <div class="overlay hidden" id="loginScreen">
-  <div class="title-big">Layna <span class="sub">アクセス管理</span></div>
+  <div class="title-big">LayCAT <span class="sub">アクセス管理</span></div>
   <div class="muted">管理者専用のコンソールです。管理者アカウントでログインしてください。</div>
   <button class="btn btn-primary" id="loginBtn">Google でログイン</button>
 </div>
 
 <div id="console" class="hidden">
   <div class="topbar">
-    <div class="brand">Layna <span class="sub">アクセス管理</span></div>
+    <div class="brand">LayCAT <span class="sub">アクセス管理</span></div>
     <div class="spacer"></div>
     <div class="user-chip" id="userChip"></div>
     <button class="btn btn-sm" id="logoutBtn">ログアウト</button>
@@ -131,7 +131,7 @@
       <!-- 認証必須トグル -->
       <div class="card">
         <div class="card-title">🔑 認証</div>
-        <div class="card-desc">オンにすると、下で許可したメンバーのみ Layna にログインできます。</div>
+        <div class="card-desc">オンにすると、下で許可したメンバーのみ LayCAT にログインできます。</div>
         <div class="mstatus off" id="arStatus"><span class="dot off" id="arDot"></span><span id="arText">状態を取得中…</span></div>
         <label class="chk"><input type="checkbox" id="authRequired"> 認証を必須にする（authRequired）</label>
       </div>
@@ -139,7 +139,7 @@
       <!-- アクセス管理 -->
       <div class="card">
         <div class="card-title">🔐 アクセス管理 / 権限付与</div>
-        <div class="card-desc">3区分でアクセスを管理します。<b>運営</b>=この設定を編集可、<b>管理者</b>=権限付与可、<b>メンバー</b>=利用のみ。許可したメールアドレスの Google アカウントが Layna を利用できます。行ごとのボタンで権限を変更・削除できます。</div>
+        <div class="card-desc">3区分でアクセスを管理します。<b>運営</b>=この設定を編集可、<b>管理者</b>=権限付与可、<b>メンバー</b>=利用のみ。許可したメールアドレスの Google アカウントが LayCAT を利用できます。行ごとのボタンで権限を変更・削除できます。</div>
 
         <label class="field-label">ユーザーを追加（メールアドレス）</label>
         <div class="add-row">
@@ -173,14 +173,14 @@
       <!-- ドメイン許可でログイン中のアカウント -->
       <div class="card">
         <div class="card-title">🪪 ドメイン許可でログイン中のアカウント</div>
-        <div class="card-desc">許可ドメインのメールで実際に Layna にログインしたアカウントです（明示的に追加されていない人も表示）。名前つきで確認でき、「→メンバーに固定」で個別メンバーに変換できます。</div>
+        <div class="card-desc">許可ドメインのメールで実際に LayCAT にログインしたアカウントです（明示的に追加されていない人も表示）。名前つきで確認でき、「→メンバーに固定」で個別メンバーに変換できます。</div>
         <div class="u-list" id="domUserList"></div>
       </div>
 
       <!-- セットアップ（ルール） -->
       <div class="card">
         <div class="card-title">⚙ セットアップ（Firebase コンソール・初回のみ）</div>
-        <div class="card-desc">このコンソールと Layna 本体は Firestore の <code>laynaAccess/config</code> を共有します。Firestore を有効化し、以下のルールを設定してください。</div>
+        <div class="card-desc">このコンソールと LayCAT 本体は Firestore の <code>laynaAccess/config</code> を共有します。Firestore を有効化し、以下のルールを設定してください。</div>
         <details open><summary>必要な Firestore セキュリティルール</summary><pre id="rulesPre2"></pre></details>
       </div>
     </div>
@@ -369,7 +369,7 @@ function paint(){
       if(luErr)msg='loggedUsers を読み込めません（'+escH(luErr)+'）。Firestore ルールに laynaAccess/loggedUsers の read/write 許可を追加してください（下部「セットアップ」参照）。';
       else if(q)msg='該当なし';
       else if(!domains.length)msg='許可ドメインが未設定です。上の「許可ドメイン」で追加してください。';
-      else msg='ドメイン許可のアカウントは、その人が Layna にログインすると表示されます（ログイン時に自動記録）。まだ誰もログインしていないか、ルール未設定の可能性があります。';
+      else msg='ドメイン許可のアカウントは、その人が LayCAT にログインすると表示されます（ログイン時に自動記録）。まだ誰もログインしていないか、ルール未設定の可能性があります。';
       dul.innerHTML='<div class="empty">'+msg+'</div>';
     }
   }
