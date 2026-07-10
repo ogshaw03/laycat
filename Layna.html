@@ -864,6 +864,30 @@ const storage={
      ・旧IndexedDB(kv/blobs) は移行のため「読み込みのみ」フォールバック */
   _ls(key){try{const s=localStorage.getItem(key);return s?JSON.parse(s):null}catch(_){return null}},
   _lsSet(key,obj){try{localStorage.setItem(key,JSON.stringify(obj));return true}catch(e){return false}},
+  /* フォルダ内ファイルへの安全な書き込み。
+     ・失敗時は writable を必ず abort してロックを解放（閉じ忘れによる以降の書込全滅を防ぐ）
+     ・NoModificationAllowedError（同一ファイルの一時ロック）は短い待機で数回リトライ
+     getDir: ディレクトリハンドルを返す関数（リトライ毎に再取得）／fn: ファイル名／data: 書き込む内容 */
+  async _write(getDir,fn,data){
+    let lastErr=null;
+    for(let attempt=0;attempt<3;attempt++){
+      let w=null;
+      try{
+        const dir=await getDir();
+        const fh=await dir.getFileHandle(fn,{create:true});
+        w=await fh.createWritable();
+        await w.write(data);
+        await w.close();w=null;
+        return true;
+      }catch(e){
+        lastErr=e;
+        if(w){try{await w.abort()}catch(_){}} /* ロック解放（これが無いと以降の保存が全て失敗し続ける） */
+        if(attempt<2&&e&&e.name==='NoModificationAllowedError'){await new Promise(r=>setTimeout(r,150*(attempt+1)));continue}
+        break;
+      }
+    }
+    throw lastErr||new Error('write failed');
+  },
   async loadLocal(){return this._ls('layna_local')||(await idbGet('kv','local'))||null},
   async saveLocal(obj){if(!this._lsSet('layna_local',obj))toast('設定の保存に失敗しました（localStorage容量超過の可能性）')},
   async loadRegistry(){const v=this._ls('layna_registry');if(v)return v;return (await idbGet('kv','registry'))||null},
@@ -886,7 +910,7 @@ const storage={
     let out=data;
     if(projectIsEncrypted(id)){out=await encryptProjectData(id,data);if(!out)return false}
     const ph=await this.projRoot(id);
-    if(ph){try{const fh=await ph.getFileHandle(this._projFileName,{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(out,null,2));await w.close();
+    if(ph){try{await this._write(()=>ph,this._projFileName,JSON.stringify(out,null,2));
       /* フォルダに保存できたら localStorage の複製は残さない（データはフォルダ側を正とする） */
       try{localStorage.removeItem('layna_proj_'+id)}catch(_){}return true}catch(e){toast('フォルダへの保存に失敗しました。接続を確認してください（この変更は未保存です）');return false}}
     /* フォルダ設定済みだが今アクセス権が無い場合：localStorage に書くと次回読込でフォルダ側の旧データが優先されて消失するため書かない */
@@ -911,7 +935,7 @@ const storage={
     let out=reels;
     if(projectIsEncrypted(id)){out=await encryptReels(id,reels);if(!out)return false}
     const ph=await this.projRoot(id);
-    if(ph){try{const dir=await this._subdir('reels',ph,true);const fh=await dir.getFileHandle('reels.json',{create:true});const w=await fh.createWritable();await w.write(JSON.stringify(out,null,2));await w.close();
+    if(ph){try{await this._write(()=>this._subdir('reels',ph,true),'reels.json',JSON.stringify(out,null,2));
       try{localStorage.removeItem('layna_reels_'+id)}catch(_){}return true}catch(e){return false}}
     /* フォルダ設定済みだがアクセス権無し：古い内容で上書きしない（プロジェクトデータと同方針） */
     if(await this.hasFolderConfigured(id))return false;
@@ -924,7 +948,7 @@ const storage={
   async putMedia(sub,fn,blob,opts){
     opts=opts||{};
     if(opts.projectId){const ph=await this.projRoot(opts.projectId);if(ph){
-      try{const dir=await this._subdir(sub,ph,true);const fh=await dir.getFileHandle(fn,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return 'p:'+opts.projectId+'|'+sub+'/'+fn}
+      try{await this._write(()=>this._subdir(sub,ph,true),fn,blob);return 'p:'+opts.projectId+'|'+sub+'/'+fn}
       catch(e){toast('ファイルの保存に失敗しました。フォルダの接続・空き容量・書き込み権限を確認してください');return null}
     }}
     return null;
@@ -1054,7 +1078,7 @@ function projectDone(root){
 function projBadge(root){return projectDone(root)?{label:'完了',color:'#5affa0'}:{label:'進行中',color:'#5a9bff'};}
 
 /* アプリのバージョン（更新確認用。更新のたびにここを上げる） */
-const APP_VERSION='2026.07.09.36';
+const APP_VERSION='2026.07.09.37';
 /* ---------- utils ---------- */
 const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
