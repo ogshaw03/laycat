@@ -159,6 +159,19 @@
         <div class="u-list" id="memberList"></div>
       </div>
 
+      <!-- 招待リンク（承認不要URL） -->
+      <div class="card">
+        <div class="card-title">🔗 招待リンク（承認不要）</div>
+        <div class="card-desc">このリンクから LayCAT を開いた人は、<b>承認なしで自動的にメンバー</b>になります。何人でも使えます（無効化するまで有効）。リンクを知っている人は誰でも入れるため、配布先は信頼できる範囲に限定してください。無効化しても、すでに参加した人はメンバーのままです（下の「参加者」から個別に解除できます）。</div>
+        <div class="add-row">
+          <input id="invLabel" type="text" placeholder="メモ（任意・例: 〇〇さん用 / 制作班用）" autocomplete="off">
+          <button class="btn btn-primary" id="invCreateBtn">＋ リンクを発行</button>
+        </div>
+        <div class="u-list" id="invList" style="margin-top:12px"></div>
+        <div class="sub-label">招待リンクから参加したメンバー</div>
+        <div class="u-list" id="invitedList"></div>
+      </div>
+
       <!-- 許可ドメイン -->
       <div class="card">
         <div class="card-title">🌐 許可ドメイン</div>
@@ -191,7 +204,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* LayCAT 専用 Firebase プロジェクト（laycat-54ee4）。Layna 本体と同じ config を使用 */
@@ -218,6 +231,17 @@ service cloud.firestore {
     match /laynaAccess/loggedUsers {
       allow read, write: if request.auth != null;
     }
+    // 招待リンク（承認不要URL）で参加したメンバー（本体が自分を登録／コンソールが集計表示）
+    match /laynaAccess/invited {
+      allow read, write: if request.auth != null;
+    }
+    // 招待リンク（承認不要URL）。運営・管理者が発行、本体は照合のため読取のみ
+    match /laynaAccessInvites/{token} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        request.auth.token.email in get(/databases/$(database)/documents/laynaAccess/config).data.operatorEmails ||
+        request.auth.token.email in get(/databases/$(database)/documents/laynaAccess/config).data.adminEmails );
+    }
   }
 }`;
 
@@ -226,7 +250,9 @@ const lc=s=>String(s||'').toLowerCase();
 function escH(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function notify(msg){const n=$('notification');if(!n)return;n.textContent=msg;n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',3500);}
 
-let me=null, cfg=null, unsub=null, unsubLU=null, query='', luUsers={}, nameByEmail={}, luErr=null;
+let me=null, cfg=null, unsub=null, unsubLU=null, unsubInv=null, unsubInvited=null, query='', luUsers={}, nameByEmail={}, luErr=null;
+let invites=[], invitedEmails={};
+const INV_COL='laynaAccessInvites';
 $('rulesPre')&&($('rulesPre').textContent=RULES);
 $('rulesPre2')&&($('rulesPre2').textContent=RULES);
 
@@ -249,8 +275,8 @@ $('logoutBtn').onclick=()=>signOut(auth);
 
 onAuthStateChanged(auth, user=>{
   $('loadingOverlay').classList.add('hidden');
-  if(unsub){unsub();unsub=null} if(unsubLU){unsubLU();unsubLU=null}
-  if(!user){ me=null;luUsers={};nameByEmail={}; $('console').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); return; }
+  if(unsub){unsub();unsub=null} if(unsubLU){unsubLU();unsubLU=null} if(unsubInv){unsubInv();unsubInv=null} if(unsubInvited){unsubInvited();unsubInvited=null}
+  if(!user){ me=null;luUsers={};nameByEmail={};invites=[];invitedEmails={}; $('console').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); return; }
   me={email:user.email,name:user.displayName||user.email,photoURL:user.photoURL};
   $('loginScreen').classList.add('hidden');
   $('console').classList.remove('hidden');
@@ -276,6 +302,16 @@ function subscribe(){
   unsubLU=onSnapshot(doc(db,'laynaAccess','loggedUsers'),
     snap=>{ luErr=null; luUsers=snap.exists()?(snap.data().users||{}):{}; rebuildNames(); if(cfg&&isEditor())paint(); },
     err=>{ luErr=err&&err.message; if(cfg&&isEditor())paint(); }
+  );
+  /* 招待リンク（承認不要URL）一覧を監視 */
+  unsubInv=onSnapshot(collection(db,INV_COL),
+    snap=>{ invites=snap.docs.map(d=>({id:d.id,...d.data()})); if(cfg&&isEditor())renderInvites(); },
+    err=>{ invites=[]; if(cfg&&isEditor())renderInvites(); }
+  );
+  /* 招待リンク経由で参加したメンバーを監視（参加人数の集計・参加者一覧に使用） */
+  unsubInvited=onSnapshot(doc(db,'laynaAccess','invited'),
+    snap=>{ invitedEmails=snap.exists()?(snap.data().emails||{}):{}; if(cfg&&isEditor())renderInvites(); },
+    err=>{ invitedEmails={}; }
   );
 }
 
@@ -373,6 +409,93 @@ function paint(){
       dul.innerHTML='<div class="empty">'+msg+'</div>';
     }
   }
+  renderInvites();
+}
+
+/* ---- 招待リンク（承認不要URL） ---- */
+function inviteBase(){const dir=location.pathname.replace(/[^/]*$/,'');return location.origin+dir+'Layna.html#invite=';}
+function genToken(){const a=new Uint8Array(12);crypto.getRandomValues(a);return Array.from(a,b=>b.toString(36).padStart(2,'0')).join('').slice(0,16);}
+function usesOf(token){return Object.values(invitedEmails||{}).filter(x=>x&&x.byToken===token).length;}
+function renderInvites(){
+  const editor=isEditor();
+  const list=$('invList');
+  if(list){
+    if(!invites.length){ list.innerHTML='<div class="empty">発行済みの招待リンクはありません。「＋ リンクを発行」で作成します。</div>'; }
+    else{
+      list.innerHTML='';
+      const sorted=[...invites].sort((a,b)=>(b.active!==false)-(a.active!==false)||(b.createdAt||0)-(a.createdAt||0));
+      sorted.forEach(i=>{
+        const url=inviteBase()+i.id, on=i.active!==false;
+        const wrap=document.createElement('div');wrap.className='u-row';wrap.style.cssText='flex-direction:column;align-items:stretch;gap:8px;opacity:'+(on?1:.6);
+        const meta=document.createElement('div');meta.style.cssText='font-size:12px;color:var(--text2);display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+        meta.innerHTML=`<b style="color:var(--text)">${escH(i.label||'（メモなし）')}</b><span>参加 ${usesOf(i.id)}人</span>`+(on?'<span style="color:var(--green)">有効</span>':'<span style="color:var(--text3)">無効</span>');
+        const rowb=document.createElement('div');rowb.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+        const inp=document.createElement('input');inp.readOnly=true;inp.value=url;inp.style.cssText='flex:1;min-width:200px;font-size:12px';inp.onclick=()=>inp.select();
+        rowb.appendChild(inp);
+        const mkb=(label,fn,danger)=>{const b=document.createElement('button');b.className='btn btn-sm'+(danger?' btn-danger':'');b.textContent=label;b.disabled=!editor;b.onclick=fn;return b;};
+        if(on){ rowb.appendChild(mkb('コピー',()=>copyInvite(url))); rowb.appendChild(mkb('無効化',()=>revokeInvite(i.id))); }
+        else{ rowb.appendChild(mkb('再有効化',()=>restoreInvite(i.id))); rowb.appendChild(mkb('削除',()=>deleteInvite(i.id),true)); }
+        wrap.appendChild(meta);wrap.appendChild(rowb);list.appendChild(wrap);
+      });
+    }
+  }
+  // 招待リンクから参加したメンバー（明示的な運営/管理者/メンバー登録済みの人は除く）
+  const ilist=$('invitedList');
+  if(ilist){
+    const {operators,admins,members}=tiers(cfg||{});
+    const explicit=new Set([...operators,...admins,...members].map(lc));
+    let arrv=Object.entries(invitedEmails||{}).map(([k,v])=>({key:k,...(v||{})})).filter(v=>v.email&&!explicit.has(lc(v.email)));
+    const q=lc(query.trim());
+    if(q)arrv=arrv.filter(v=>lc(v.email).includes(q)||lc(nameOf(v.email)||v.name||'').includes(q));
+    arrv.sort((a,b)=>lc(nameOf(a.email)||a.email).localeCompare(lc(nameOf(b.email)||b.email)));
+    ilist.innerHTML='';
+    arrv.forEach(v=>{
+      const self=(me&&lc(v.email)===lc(me.email))?'（あなた）':'';
+      const nm=nameOf(v.email)||v.name||'';
+      const row=document.createElement('div');row.className='u-row';
+      row.innerHTML=(nm?`<span class="u-email"><span class="u-name">${escH(nm)}${self}</span><span class="u-mail">${escH(v.email)}</span></span>`:`<span class="u-email"><span class="u-name">${escH(v.email)}${self}</span></span>`)+`<span class="role member">招待</span>`;
+      const bp=document.createElement('button');bp.className='btn btn-sm';bp.textContent='→メンバーに固定';bp.disabled=!editor;bp.onclick=()=>setRole(v.email,'member');row.appendChild(bp);
+      const bd=document.createElement('button');bd.className='btn btn-sm btn-danger';bd.textContent='解除';bd.disabled=!editor;bd.onclick=()=>removeInvited(v.key,v.email);row.appendChild(bd);
+      ilist.appendChild(row);
+    });
+    if(!arrv.length)ilist.innerHTML='<div class="empty">'+(lc(query.trim())?'該当なし':'招待リンクから参加した人はまだいません。')+'</div>';
+  }
+}
+async function copyInvite(url){try{await navigator.clipboard.writeText(url);notify('リンクをコピーしました');}catch(_){notify('コピーできません。リンク欄を選択して手動でコピーしてください');}}
+async function createInvite(){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  const label=($('invLabel').value||'').trim();
+  const token=genToken();
+  try{
+    await setDoc(doc(db,INV_COL,token),{active:true,label,role:'member',createdBy:me.email||'',createdAt:Date.now(),uses:0});
+    $('invLabel').value='';
+    const url=inviteBase()+token;
+    try{ await navigator.clipboard.writeText(url); notify('招待リンクを発行しコピーしました'); }
+    catch(_){ notify('招待リンクを発行しました'); }
+  }catch(e){ notify('発行失敗: '+e.message); }
+}
+async function revokeInvite(token){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  if(!confirm('このリンクを無効化しますか？以後このリンクからは参加できません（参加済みの人はそのまま利用できます）。'))return;
+  try{ await setDoc(doc(db,INV_COL,token),{active:false,revokedBy:me.email||'',revokedAt:Date.now()},{merge:true}); notify('無効化しました'); }
+  catch(e){ notify('失敗: '+e.message); }
+}
+async function restoreInvite(token){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  try{ await setDoc(doc(db,INV_COL,token),{active:true},{merge:true}); notify('再有効化しました'); }
+  catch(e){ notify('失敗: '+e.message); }
+}
+async function deleteInvite(token){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  if(!confirm('このリンクを完全に削除しますか？元に戻せません。'))return;
+  try{ await deleteDoc(doc(db,INV_COL,token)); notify('削除しました'); }
+  catch(e){ notify('削除失敗: '+e.message); }
+}
+async function removeInvited(key,email){
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  if(!confirm((email||'このメンバー')+' の招待による参加を解除しますか？（有効なリンクがあれば再度参加できます）'))return;
+  try{ await setDoc(doc(db,'laynaAccess','invited'),{emails:{[key]:deleteField()}},{merge:true}); notify('解除しました: '+(email||key)); }
+  catch(e){ notify('失敗: '+e.message); }
 }
 
 async function readConfig(){const snap=await getDoc(doc(db,...CFG_PATH));return snap.exists()?snap.data():{};}
@@ -453,6 +576,8 @@ $('addBtn').onclick=addUser;
 $('addEmail').addEventListener('keydown',e=>{if(e.key==='Enter')addUser();});
 $('domAddBtn').onclick=addDomain;
 $('domInput').addEventListener('keydown',e=>{if(e.key==='Enter')addDomain();});
+$('invCreateBtn').onclick=createInvite;
+$('invLabel').addEventListener('keydown',e=>{if(e.key==='Enter')createInvite();});
 $('search').addEventListener('input',()=>{query=$('search').value;if(cfg&&isEditor())paint();});
 </script>
 </body>
