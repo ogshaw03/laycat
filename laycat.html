@@ -4927,9 +4927,10 @@ let pgWin=null;const pgUI={};
 /* 工程の表示順（Pipeline _stage_rank 準拠）: lay系→anm系→その他、同順位は名前順 */
 function stageRank(name){const low=(name||'').toLowerCase();let r;if(low.startsWith('lay')||low.startsWith('layout'))r=0;else if(low.startsWith('anm')||low.startsWith('anim'))r=1;else r=2;return [r,low];}
 function stageRankCmp(a,b){const ra=stageRank(a),rb=stageRank(b);return ra[0]-rb[0]||(ra[1]<rb[1]?-1:ra[1]>rb[1]?1:0);}
-/* 工程カラー（Pipeline stage_color 準拠：固定マップ＋文字コードハッシュ） */
-const STAGE_COLOR_MAP={lay_pri:'#4a90d9',lay_anm:'#5fb878',anm_pri:'#e8a838',anm_sec:'#d9734a'};
-const STAGE_PALETTE=['#4a90d9','#5fb878','#e8a838','#d9734a','#9b6dd6','#46c4b8','#d96d9e','#c5c043'];
+/* 工程カラー：無彩色（濃さ違いのグレー）で統一。色分けが見づらいという要望により achromatic 化。
+   バッジ文字は濃色(#101013)なので、判別できる範囲で明るめのグレーを使う。 */
+const STAGE_COLOR_MAP={lay_pri:'#d0d0d8',lay_anm:'#bcbcc6',anm_pri:'#a6a6b1',anm_sec:'#c6c6cf'};
+const STAGE_PALETTE=['#cfcfd7','#b7b7c1','#9f9faa','#dcdce2','#c3c3cc','#ababb6','#d5d5dc','#b0b0bb'];
 function stageColor(stage){if(!stage)return '#5a5a6a';const key=stage.toLowerCase().split('/').pop();if(STAGE_COLOR_MAP[key])return STAGE_COLOR_MAP[key];let h=0;for(const c of stage.toLowerCase())h+=c.charCodeAt(0);return STAGE_PALETTE[h%STAGE_PALETTE.length];}
 /* ノード配下（自身＋子孫）にある最新動画のアップロード時刻（ISO文字列/なければnull） */
 function latestVideoTimeUnder(nodeId){let best=null;const ns=[getNode(nodeId),...descendants(nodeId)];for(const n of ns)if(n)for(const v of (n.versions||[]))if(v.type==='video'){const t=v.uploadedAt||'';if(best===null||t>best)best=t}return best;}
