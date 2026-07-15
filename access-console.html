@@ -602,7 +602,7 @@ $('authRequired').onchange=async()=>{
 
 $('bootBtn').onclick=async()=>{
   try{
-    await setDoc(doc(db,...CFG_PATH),{authRequired:true,operatorEmails:[me.email],adminEmails:[],allowedEmails:[],allowedDomains:[],updatedBy:me.email,updatedAt:new Date().toISOString()});
+    await setDoc(doc(db,...CFG_PATH),{authRequired:true,operatorEmails:[lc(me.email)],adminEmails:[],allowedEmails:[],allowedDomains:[],updatedBy:me.email,updatedAt:new Date().toISOString()});
     notify('初期化しました（あなたが運営になりました）');
   }catch(e){ notify('初期化失敗: '+e.message+'（Firestore のルールを確認してください）'); }
 };
