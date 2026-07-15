@@ -219,28 +219,63 @@ const provider=new GoogleAuthProvider();
 const RULES=`rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ===== 共通ヘルパ =====
+    function signedIn() { return request.auth != null; }
+
+    // アクセス設定（未作成なら空扱い）。運営/管理者の判定に使う
+    function cfgData() {
+      return exists(/databases/$(database)/documents/laynaAccess/config)
+        ? get(/databases/$(database)/documents/laynaAccess/config).data
+        : {};
+    }
+    function isStaff() {
+      return signedIn() && (
+        request.auth.token.email in cfgData().get('operatorEmails', []) ||
+        request.auth.token.email in cfgData().get('adminEmails', [])
+      );
+    }
+
+    // 本体/コンソールが使うメールキー（emailを小文字化し記号を _ に）。
+    // 実在メールに現れない [ ] は対象外（結果は本体の変換と一致する）
+    function myKey() {
+      return request.auth.token.email.lower().replace('[.@#$/]', '_');
+    }
+    // mapフィールド(field)への変更が「自分のキー1件だけ」か（自己登録用）
+    function onlyMyKey(field) {
+      return request.resource.data.get(field, {})
+        .diff(resource == null ? {} : resource.data.get(field, {}))
+        .affectedKeys().hasOnly([myKey()]);
+    }
+
+    // ===== アクセス設定（読取=認証者／編集=運営・管理者のみ） =====
     match /laynaAccess/config {
-      allow read: if request.auth != null;
-      // 運営・管理者が編集可
-      allow write: if request.auth != null && (
-        request.auth.token.email in resource.data.operatorEmails ||
-        request.auth.token.email in resource.data.adminEmails );
-      allow create: if request.auth != null;  // 初回だけ（作成者を運営に）
+      allow read:           if signedIn();          // 本体が許可判定のため読む
+      allow create:         if signedIn();          // 初回ブートストラップ（作成者を運営に）
+      allow update:         if isStaff();
+      allow delete:         if false;
     }
-    // ログイン記録（本体が自分の情報を書き込み／コンソールが読取）
+
+    // ===== ログイン記録（各自が自分の1件だけ書込。全体の上書き・改ざんを禁止） =====
     match /laynaAccess/loggedUsers {
-      allow read, write: if request.auth != null;
+      allow read:           if signedIn();          // 表示名/写真の索引（機微度は低い）
+      allow create, update: if signedIn() && (isStaff() || onlyMyKey('users'));
+      allow delete:         if isStaff();
     }
-    // 招待リンク（承認不要URL）で参加したメンバー（本体が自分を登録／コンソールが集計表示）
+
+    // ===== 招待URL参加者の名簿（各自が自分の1件だけ登録。削除・全体上書きは運営/管理者） =====
+    // 本体はこの名簿を読んで「招待済みメンバー」を許可するため、readは認証者に許可
     match /laynaAccess/invited {
-      allow read, write: if request.auth != null;
+      allow read:           if signedIn();
+      allow create, update: if signedIn() && (isStaff() || onlyMyKey('emails'));
+      allow delete:         if isStaff();
     }
-    // 招待リンク（承認不要URL）。運営・管理者が発行、本体は照合のため読取のみ
+
+    // ===== 招待リンク（トークン）。list(列挙)禁止でトークン総当りを防ぐ =====
     match /laynaAccessInvites/{token} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && (
-        request.auth.token.email in get(/databases/$(database)/documents/laynaAccess/config).data.operatorEmails ||
-        request.auth.token.email in get(/databases/$(database)/documents/laynaAccess/config).data.adminEmails );
+      allow get:            if signedIn();          // URLを知る本人が照合のため単体取得
+      allow list:           if isStaff();           // 一覧はコンソール(運営/管理者)のみ
+      allow write:          if isStaff();           // 発行・無効化・削除は運営/管理者
     }
   }
 }`;
