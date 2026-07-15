@@ -57,6 +57,32 @@
 
 ---
 
+## 対応する動画コーデック（.mov / .mp4）
+
+`.mov` ファイル自体は受け入れます（MIME が空でも拡張子で動画と判定）。ただし**サムネイル生成・再生ができるかは中の「コーデック」次第**です。ブラウザ（`<video>` タグ）が再生できるのは H.264 / H.265 / VP9 / AV1 などに限られ、これは LayCAT に限らずどの Web ツールでも共通の制約です。
+
+### Maya の QuickTime（qt）書き出しコーデック別の対応
+
+| Maya QuickTime の書き出しコーデック | ブラウザでの再生 | LayCAT での表示 |
+| ---- | ---- | ---- |
+| **H.264** | Chrome / Edge / Safari で可 | ✅ サムネ・再生OK |
+| Animation（RLE） | 全ブラウザ不可 | ❌ 保存はできるが黒画・再生不可 |
+| Photo-JPEG | 全ブラウザ不可 | ❌ 同上 |
+| PNG / None(raw) | 全ブラウザ不可 | ❌ 同上 |
+| Apple ProRes | 全ブラウザ不可 | ❌ 同上 |
+
+> Maya の QuickTime 書き出しは Animation・Photo-JPEG・ProRes などが選ばれていることが多く、その場合はブラウザで再生できません。
+
+### 確実に動かすには（H.264 で書き出す／変換する）
+
+- **Maya 側**：Playblast／ムービー書き出しのエンコーダを **H.264** に設定する。
+- **変換**：`ffmpeg -i input.mov -c:v libx264 -pix_fmt yuv420p -movflags +faststart output.mp4`
+  （`-pix_fmt yuv420p` が重要。422/444 だとブラウザで再生できないことがあります）
+
+> 再生できないコーデックの動画は、LayCAT の再生窓の中に「この動画はブラウザで再生できないコーデックの可能性があります（Animation / ProRes 等）。H.264 の mp4 / mov へ変換してください」と常時表示されます。
+
+---
+
 ## アクセス管理
 
 ライブサイト（`https://ogshaw03.github.io/laycat/`）では **Google ログイン**で入室可否を判定します（`github.io` 以外＝ローカル/exe/プレビューでは自動的に認証オフ）。
@@ -84,7 +110,8 @@ Layna/
 └── server/ public/ data/ storage/  # サーバー版（下記・任意）
 ```
 
-## docs（設計メモ）
+## docs（使い方・設計メモ）
+- `docs/USAGE.md` … **使い方ドキュメント**（アップロード〜レビュー〜提出、メンテナンス/お知らせ、動画コーデック対応表を含む）
 - `docs/PROJECT_ACCESS_PLAN.md` … アクセス制御の現状と今後（名簿ベース／Firebase 付与式）
 - `docs/PLUGIN_SYSTEM_PLAN.md` … プラグイン制度の構想
 - `docs/COMPARE_PLAYBACK_PLAN.md` … 比較再生の同期方式と今後（フレームキャッシュ案）
