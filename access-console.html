@@ -136,6 +136,34 @@
         <label class="chk"><input type="checkbox" id="authRequired"> 認証を必須にする（authRequired）</label>
       </div>
 
+      <!-- メンテナンス制御 -->
+      <div class="card">
+        <div class="card-title">🛠 メンテナンス制御</div>
+        <div class="card-desc">開始するとアクセス中の全メンバーがメンテナンス画面になります（運営・管理者は上部バナーで閲覧可）。<b>解除すると全メンバーのページが自動的に再読み込み</b>されます。</div>
+        <div class="mstatus off" id="mStatus"><span class="dot off" id="mDot"></span><span id="mStatusText">状態を取得中…</span></div>
+        <div id="mMeta" style="font-size:11px;color:#8a8a92;margin:6px 0 2px"></div>
+        <label class="field-label">メンテナンス画面に表示するメッセージ</label>
+        <textarea id="mMessage" rows="2" placeholder="ただいまメンテナンス中です。しばらくお待ちください。"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-primary" id="mStartBtn">🛠 メンテナンス開始</button>
+          <button class="btn" id="mEndBtn">✓ 解除（全員を再読み込み）</button>
+        </div>
+      </div>
+
+      <!-- 全体メッセージ（お知らせ） -->
+      <div class="card">
+        <div class="card-title">📢 全メンバーへのお知らせ</div>
+        <div class="card-desc">メンテナンス予告などのメッセージを全メンバーの画面上部に表示します。各メンバーは確認後に自分で消せます。</div>
+        <div class="mstatus off" id="bStatus"><span class="dot off" id="bDot"></span><span id="bStatusText">お知らせはありません</span></div>
+        <div id="bMeta" style="font-size:11px;color:#8a8a92;margin:6px 0 2px"></div>
+        <label class="field-label">お知らせ本文</label>
+        <textarea id="bMessage" rows="3" placeholder="例: 本日22:00よりメンテナンスを実施します。"></textarea>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-primary" id="bSendBtn">📢 送信 / 更新</button>
+          <button class="btn" id="bClearBtn">お知らせを取り下げる</button>
+        </div>
+      </div>
+
       <!-- アクセス管理 -->
       <div class="card">
         <div class="card-title">🔐 アクセス管理 / 権限付与</div>
@@ -277,6 +305,16 @@ service cloud.firestore {
       allow list:           if isStaff();           // 一覧はコンソール(運営/管理者)のみ
       allow write:          if isStaff();           // 発行・無効化・削除は運営/管理者
     }
+
+    // ===== メンテナンス / 全体お知らせ（読取=認証者／編集=運営・管理者のみ） =====
+    match /laynaAccess/maintenance {
+      allow read:           if signedIn();
+      allow write:          if isStaff();
+    }
+    match /laynaAccess/broadcast {
+      allow read:           if signedIn();
+      allow write:          if isStaff();
+    }
   }
 }`;
 
@@ -285,7 +323,7 @@ const lc=s=>String(s||'').toLowerCase();
 function escH(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function notify(msg){const n=$('notification');if(!n)return;n.textContent=msg;n.style.display='block';clearTimeout(n._t);n._t=setTimeout(()=>n.style.display='none',3500);}
 
-let me=null, cfg=null, unsub=null, unsubLU=null, unsubInv=null, unsubInvited=null, query='', luUsers={}, nameByEmail={}, luErr=null;
+let me=null, cfg=null, unsub=null, unsubLU=null, unsubInv=null, unsubInvited=null, unsubMaint=null, unsubBcast=null, query='', luUsers={}, nameByEmail={}, luErr=null;
 let invites=[], invitedEmails={};
 const INV_COL='laynaAccessInvites';
 $('rulesPre')&&($('rulesPre').textContent=RULES);
@@ -310,7 +348,7 @@ $('logoutBtn').onclick=()=>signOut(auth);
 
 onAuthStateChanged(auth, user=>{
   $('loadingOverlay').classList.add('hidden');
-  if(unsub){unsub();unsub=null} if(unsubLU){unsubLU();unsubLU=null} if(unsubInv){unsubInv();unsubInv=null} if(unsubInvited){unsubInvited();unsubInvited=null}
+  if(unsub){unsub();unsub=null} if(unsubLU){unsubLU();unsubLU=null} if(unsubInv){unsubInv();unsubInv=null} if(unsubInvited){unsubInvited();unsubInvited=null} if(unsubMaint){unsubMaint();unsubMaint=null} if(unsubBcast){unsubBcast();unsubBcast=null}
   if(!user){ me=null;luUsers={};nameByEmail={};invites=[];invitedEmails={}; $('console').classList.add('hidden'); $('loginScreen').classList.remove('hidden'); return; }
   me={email:user.email,name:user.displayName||user.email,photoURL:user.photoURL};
   $('loginScreen').classList.add('hidden');
@@ -348,7 +386,57 @@ function subscribe(){
     snap=>{ invitedEmails=snap.exists()?(snap.data().emails||{}):{}; if(cfg&&isEditor())renderInvites(); },
     err=>{ invitedEmails={}; }
   );
+  /* メンテナンス / 全体お知らせ を監視 */
+  unsubMaint=onSnapshot(maintRef(), snap=>renderMaintenance(snap.exists()?snap.data():{}), err=>{});
+  unsubBcast=onSnapshot(bcastRef(), snap=>renderBroadcast(snap.exists()?snap.data():{}), err=>{});
 }
+/* ===== メンテナンス / 全体メッセージ（OGREF相当。laynaAccess/maintenance・broadcast を共有） ===== */
+function maintRef(){return doc(db,'laynaAccess','maintenance')}
+function bcastRef(){return doc(db,'laynaAccess','broadcast')}
+function fmtTs(ts){if(!ts)return'';try{const d=new Date(ts);return d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}catch(_){return''}}
+function renderMaintenance(d){
+  const active=!!(d&&d.active);
+  $('mStatus').className='mstatus '+(active?'on':'off');
+  $('mDot').className='dot '+(active?'on':'off');
+  $('mStatusText').textContent=active?'メンテナンス中（メンバーはアクセス不可）':'稼働中（メンテナンスOFF）';
+  let meta='';
+  if(active)meta=(d.by?'実行者: '+d.by+' / ':'')+(d.startedAt?'開始: '+fmtTs(d.startedAt):'');
+  else if(d&&d.endedAt)meta='前回解除: '+fmtTs(d.endedAt);
+  $('mMeta').textContent=meta;
+  if(active&&d.message&&document.activeElement!==$('mMessage'))$('mMessage').value=d.message;
+}
+function renderBroadcast(d){
+  const msg=d&&d.message?d.message:'';const on=!!msg;
+  $('bStatus').className='mstatus '+(on?'on':'off');
+  $('bDot').className='dot '+(on?'on':'off');
+  $('bStatusText').textContent=on?'お知らせ配信中':'お知らせはありません';
+  let meta='';
+  if(on)meta=(d.by?'送信者: '+d.by+' / ':'')+(d.createdAt?'送信: '+fmtTs(d.createdAt):'');
+  $('bMeta').textContent=meta;
+  if(on&&document.activeElement!==$('bMessage'))$('bMessage').value=msg;
+}
+$('mStartBtn').onclick=async()=>{
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  const message=($('mMessage').value||'').trim();
+  if(!confirm('メンテナンスを開始します。\nアクセス中の全メンバーがメンテナンス画面になります。よろしいですか？'))return;
+  try{await setDoc(maintRef(),{active:true,message,startedAt:Date.now(),by:me.email||''});notify('メンテナンスを開始しました')}catch(e){notify('失敗: '+e.message)}
+};
+$('mEndBtn').onclick=async()=>{
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  if(!confirm('メンテナンスを解除します。\n全メンバーのページが自動的に再読み込みされます。よろしいですか？'))return;
+  try{await setDoc(maintRef(),{active:false,endedAt:Date.now()},{merge:true});notify('解除しました（全員を再読み込み）')}catch(e){notify('失敗: '+e.message)}
+};
+$('bSendBtn').onclick=async()=>{
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  const message=($('bMessage').value||'').trim();
+  if(!message)return notify('本文を入力してください');
+  try{await setDoc(bcastRef(),{id:Date.now(),message,by:me.email||'',createdAt:Date.now()});notify('お知らせを全メンバーに送信しました')}catch(e){notify('失敗: '+e.message)}
+};
+$('bClearBtn').onclick=async()=>{
+  if(!isEditor())return notify('運営・管理者のみ実行できます');
+  if(!confirm('お知らせを取り下げますか？（全メンバーの表示が消えます）'))return;
+  try{await setDoc(bcastRef(),{id:Date.now(),message:'',by:me.email||'',createdAt:Date.now()});$('bMessage').value='';notify('お知らせを取り下げました')}catch(e){notify('失敗: '+e.message)}
+};
 
 function showError(msg){
   ['bootstrapCard','notOpCard','opArea'].forEach(id=>$(id).classList.add('hidden'));
